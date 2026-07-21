@@ -12,16 +12,19 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
       <span
         ref={ref}
         className={cn(
-          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors",
+          "inline-flex items-center px-2 py-0.5 text-xs font-bold uppercase tracking-widest transition-colors",
           {
-            "bg-primary/20 text-primary border border-primary/30": variant === 'default',
-            "bg-critical/20 text-critical border border-critical/50 glow-red": variant === 'critical',
-            "bg-orange-500/20 text-orange-400 border border-orange-500/30": variant === 'high',
-            "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30": variant === 'medium',
-            "bg-accent/20 text-accent border border-accent/30": variant === 'low',
+            "bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/50": variant === 'default',
+            "bg-cyber-pink/20 text-cyber-pink border border-cyber-pink/50 glow-red": variant === 'critical',
+            "bg-cyber-yellow/20 text-cyber-yellow border border-cyber-yellow/50 glow-yellow": variant === 'high',
+            "bg-orange-500/20 text-orange-400 border border-orange-500/50": variant === 'medium',
+            "bg-accent/20 text-accent border border-accent/50": variant === 'low',
           },
           className
         )}
+        style={{
+          clipPath: 'polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px)'
+        }}
         {...props}
       />
     );

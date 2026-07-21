@@ -18,19 +18,24 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center font-bold tracking-widest uppercase transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 relative overflow-hidden",
           {
-            "bg-primary text-background hover:bg-primary/90": variant === 'default',
-            "border border-primary/50 text-primary hover:bg-primary/10": variant === 'outline',
-            "hover:bg-surface text-gray-300 hover:text-white": variant === 'ghost',
-            "bg-primary text-background glow-cyan hover:bg-primary/90": variant === 'glow',
-            "h-9 px-4 py-2": size === 'default',
-            "h-8 rounded-md px-3 text-xs": size === 'sm',
-            "h-10 rounded-md px-8": size === 'lg',
-            "h-9 w-9": size === 'icon',
+            "bg-cyber-cyan text-cyber-black hover:bg-cyber-yellow hover:text-cyber-black": variant === 'default',
+            "border-2 border-cyber-cyan text-cyber-cyan hover:bg-cyber-cyan hover:text-cyber-black": variant === 'outline',
+            "hover:bg-cyber-dark text-cyber-gray hover:text-cyber-cyan": variant === 'ghost',
+            "bg-cyber-cyan text-cyber-black glow-cyan hover:bg-cyber-yellow hover:glow-yellow": variant === 'glow',
+            "h-10 px-6 py-2 text-sm": size === 'default',
+            "h-8 px-4 text-xs": size === 'sm',
+            "h-14 px-10 text-lg": size === 'lg',
+            "h-10 w-10": size === 'icon',
           },
+          // Adding angled corners via clip-path for that cyberpunk feel
+          "clip-path-[polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)]",
           className
         )}
+        style={{
+          clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
+        }}
         {...props}
       />
     );

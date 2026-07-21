@@ -13,11 +13,19 @@ export default {
         secondary: '#1e3a8a',
         accent: '#39ff14',
         critical: '#ff003c',
-        border: '#1f2937'
+        border: '#1f2937',
+        // Cyberpunk colors
+        'cyber-black': '#0a0a0c',
+        'cyber-dark': '#121216',
+        'cyber-gray': '#8e8e9f',
+        'cyber-cyan': '#00d2ff',
+        'cyber-pink': '#ff003c',
+        'cyber-yellow': '#fadf00',
+        'cyber-purple': '#b026ff',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['Fira Code', 'monospace']
+        sans: ['Rajdhani', 'sans-serif'],
+        mono: ['Share Tech Mono', 'monospace']
       }
     },
   },

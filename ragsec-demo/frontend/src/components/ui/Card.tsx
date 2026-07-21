@@ -3,7 +3,7 @@ import { forwardRef } from 'react';
 import { cn } from './Button';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  glow?: 'cyan' | 'red' | 'none';
+  glow?: 'cyan' | 'red' | 'yellow' | 'none';
 }
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
@@ -12,10 +12,11 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          "glass-panel rounded-xl p-6",
+          "cyber-panel p-6",
           {
-            "glow-cyan border-primary/50": glow === 'cyan',
-            "glow-red border-critical/50": glow === 'red',
+            "glow-cyan border-cyber-cyan/80": glow === 'cyan',
+            "glow-red border-cyber-pink/80": glow === 'red',
+            "glow-yellow border-cyber-yellow/80": glow === 'yellow',
           },
           className
         )}

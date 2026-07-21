@@ -1,0 +1,8 @@
+- `[/]` Scaffold `ragtec-demo/backend` (Express)
+- `[ ]` Scaffold `ragtec-demo/frontend` (Vite, React, TS, Tailwind)
+- `[ ]` Setup Tailwind, Framer Motion, Recharts, Lucide React
+- `[ ]` Implement backend (Mock DB, APIs, Scoring formula)
+- `[ ]` Implement frontend components (Card, Button, Badge)
+- `[ ]` Implement frontend pages (Landing, Dashboard, Threat Feed, AI Assistant, Retrieval Demo, Architecture, About)
+- `[ ]` Create `launch_ragtec.bat` (Run backend and frontend)
+- `[ ]` Create `git_update_ragtec.bat` (Commit all files to git)

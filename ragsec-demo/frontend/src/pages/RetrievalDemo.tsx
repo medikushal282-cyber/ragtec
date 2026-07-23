@@ -50,7 +50,7 @@ export default function RetrievalDemo() {
         <div className="flex items-center gap-2">
           <span className="text-2xl font-bold text-gray-700">#{index + 1}</span>
           <div>
-            <h4 className={`font-bold ${isRagsec && index === 0 ? 'text-primary' : 'text-white'}`}>{threat.id}</h4>
+            <h4 className={`font-bold break-all ${isRagsec && index === 0 ? 'text-primary' : 'text-white'}`}>{threat.id}</h4>
             <span className="text-xs text-gray-400">{new Date(threat.timestamp).toLocaleDateString()}</span>
           </div>
         </div>
@@ -89,7 +89,7 @@ export default function RetrievalDemo() {
   );
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-500">
+    <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-500 w-full min-w-0">
       <header className="text-center mb-12">
         <h1 className="text-4xl font-extrabold mb-4">Time-Aware Retrieval Demo</h1>
         <p className="text-xl text-gray-400 max-w-3xl mx-auto">

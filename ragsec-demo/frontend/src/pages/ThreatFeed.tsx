@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Search, Filter, ShieldAlert } from 'lucide-react';
@@ -9,20 +9,27 @@ export default function ThreatFeed() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/threats')
+    fetch('http://localhost:8000/api/threats')
       .then(res => res.json())
       .then(data => setThreats(data))
       .catch(() => console.error("Error fetching threats"));
+
+    const ws = new WebSocket('ws://localhost:8000/ws/threats');
+    ws.onmessage = (event) => {
+      const newThreat = JSON.parse(event.data);
+      setThreats(prev => [newThreat, ...prev]);
+    };
+    return () => ws.close();
   }, []);
 
   const filteredThreats = threats.filter(t => 
     t.id?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     t.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    t.origin?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 w-full min-w-0">
       <header className="mb-8 flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold">Threat Intelligence Feed</h1>
@@ -49,23 +56,23 @@ export default function ThreatFeed() {
             <thead>
               <tr className="border-b border-white/10 bg-surface/50">
                 <th className="p-4 font-semibold text-gray-300">Threat ID</th>
+                <th className="p-4 font-semibold text-gray-300">Name</th>
                 <th className="p-4 font-semibold text-gray-300">Type</th>
                 <th className="p-4 font-semibold text-gray-300">Severity</th>
                 <th className="p-4 font-semibold text-gray-300">Date</th>
                 <th className="p-4 font-semibold text-gray-300">Source</th>
-                <th className="p-4 font-semibold text-gray-300">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredThreats.length > 0 ? filteredThreats.map((threat) => {
-                const isCritical = threat.severity === 'Critical';
-                const isZeroDay = threat.type === 'Zero-Day';
+                const isCritical = threat.severity?.toLowerCase() === 'critical';
+                const isZeroDay = threat.type === 'Zero-Day' || threat.type === 'RAG Injection';
                 
                 return (
-                  <tr 
-                    key={threat.id} 
-                    className={`hover:bg-white/5 transition-colors ${isCritical || isZeroDay ? 'bg-red-500/5' : ''}`}
-                  >
+                  <React.Fragment key={threat.id}>
+                    <tr 
+                      className={`hover:bg-white/5 transition-colors ${isCritical || isZeroDay ? 'bg-red-500/5' : ''}`}
+                    >
                     <td className="p-4">
                       <div className="flex items-center gap-2 font-mono font-medium">
                         {isCritical && <ShieldAlert className="w-4 h-4 text-critical" />}
@@ -74,22 +81,27 @@ export default function ThreatFeed() {
                         </span>
                       </div>
                     </td>
-                    <td className="p-4 text-gray-300">{threat.type}</td>
+                    <td className="p-4 text-gray-300 font-medium max-w-xs truncate" title={threat.name}>{threat.name || 'Unknown'}</td>
+                    <td className="p-4 text-gray-400">{threat.type}</td>
                     <td className="p-4">
-                      <Badge variant={threat.severity.toLowerCase() as any}>
-                        {threat.severity}
+                      <Badge variant={threat.severity?.toLowerCase() === 'critical' ? 'critical' : 'default'}>
+                        {threat.severity || 'Unknown'}
                       </Badge>
                     </td>
-                    <td className="p-4 text-gray-400 text-sm">
-                      {new Date(threat.timestamp).toLocaleString()}
+                    <td className="p-4 text-gray-400 text-sm whitespace-nowrap">
+                      {threat.ts}
                     </td>
-                    <td className="p-4 text-gray-400 text-sm">{threat.source}</td>
-                    <td className="p-4">
-                      <Badge variant={threat.status === 'Active' ? 'critical' : threat.status === 'Mitigated' ? 'low' : 'default'}>
-                        {threat.status}
-                      </Badge>
-                    </td>
+                    <td className="p-4 text-gray-400 text-sm">{threat.origin}</td>
                   </tr>
+                  {threat.solution && (
+                    <tr key={`${threat.id}-solution`} className={`border-b border-white/5 bg-black/20 ${isCritical || isZeroDay ? 'bg-red-500/5' : ''}`}>
+                      <td colSpan={6} className="p-4 pl-12 text-sm text-gray-400">
+                        <span className="text-cyber-cyan font-semibold mr-2">Recommended Action:</span>
+                        {threat.solution}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               }) : (
                 <tr>

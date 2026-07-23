@@ -7,17 +7,24 @@ export default function Dashboard() {
   const [threats, setThreats] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/threats')
+    fetch('http://localhost:8000/api/threats/initial')
       .then(res => res.json())
       .then(data => setThreats(data))
       .catch(() => console.error("Error fetching threats, using fallback data for demo if backend is offline."));
+
+    const ws = new WebSocket('ws://localhost:8000/ws/threats');
+    ws.onmessage = (event) => {
+      const newThreat = JSON.parse(event.data);
+      setThreats(prev => [newThreat, ...prev].slice(0, 50));
+    };
+    return () => ws.close();
   }, []);
 
   // Compute metrics
   const totalThreats = threats.length;
-  const criticalThreats = threats.filter(t => t.severity === 'Critical').length;
-  const highThreats = threats.filter(t => t.severity === 'High').length;
-  const zeroDays = threats.filter(t => t.type === 'Zero-Day').length;
+  const criticalThreats = threats.filter(t => t.severity.toLowerCase() === 'critical').length;
+  const highThreats = threats.filter(t => t.severity.toLowerCase() === 'high').length;
+  const zeroDays = threats.filter(t => t.type === 'Zero-Day' || t.type === 'RAG Injection').length;
 
   // Mock data for charts if API is slow/offline
   const timeData = [
@@ -37,7 +44,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 w-full min-w-0">
       <header className="mb-8">
         <h1 className="text-3xl font-bold">SOC Dashboard</h1>
         <p className="text-gray-400">Real-time enterprise threat overview.</p>
@@ -152,13 +159,22 @@ export default function Dashboard() {
         <div className="space-y-4">
           {(threats.length > 0 ? threats.slice(0, 5) : [1,2,3]).map((threat: any, i) => (
             <div key={threat.id || i} className="flex items-start gap-4 p-4 rounded-lg bg-surface/50 border border-white/5 hover:bg-surface transition-colors">
-              <div className={`mt-1 w-2 h-2 rounded-full ${threat.severity === 'Critical' ? 'bg-critical shadow-[0_0_8px_#ff003c]' : 'bg-primary shadow-[0_0_8px_#00d2ff]'}`} />
+              <div className={`mt-1 w-2 h-2 rounded-full ${threat.severity?.toLowerCase() === 'critical' ? 'bg-critical shadow-[0_0_8px_#ff003c]' : 'bg-primary shadow-[0_0_8px_#00d2ff]'}`} />
               <div className="flex-1">
                 <div className="flex justify-between">
-                  <h4 className="font-medium">{threat.id || `Threat-${i}`} - {threat.type || 'Unknown'}</h4>
-                  <span className="text-xs text-gray-500">{threat.timestamp ? new Date(threat.timestamp).toLocaleDateString() : 'Just now'}</span>
+                  <h4 className="font-medium">{threat.id || `Threat-${i}`} - {threat.name || threat.type || 'Unknown'}</h4>
+                  <span className="text-xs text-gray-500">{threat.ts || 'Just now'}</span>
                 </div>
-                <p className="text-sm text-gray-400 mt-1">{threat.description || 'Loading...'}</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  <span className="text-white">Type:</span> {threat.type || 'Unknown'} <br/>
+                  <span className="text-white">Origin:</span> {threat.origin || 'System'}
+                </p>
+                {threat.solution && (
+                  <div className="mt-2 text-xs bg-black/40 p-2 rounded border border-white/10 text-gray-300">
+                    <span className="text-cyber-cyan font-bold block mb-1">Mitigation:</span>
+                    {threat.solution}
+                  </div>
+                )}
               </div>
             </div>
           ))}

@@ -53,7 +53,7 @@ export default function AIAssistant() {
   };
 
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4 animate-in fade-in duration-500">
+    <div className="h-full w-full min-w-0 flex flex-col space-y-4 animate-in fade-in duration-500">
       <header className="shrink-0">
         <h1 className="text-3xl font-bold">AI Threat Assistant</h1>
         <p className="text-gray-400">Grounded analysis with evidence and confidence scores.</p>
@@ -94,7 +94,7 @@ export default function AIAssistant() {
                       {msg.evidence.map((ev: string, i: number) => (
                         <div key={i} className="flex items-start gap-2 text-sm text-gray-300">
                           <FileText className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                          <span>{ev}</span>
+                          <span className="break-all">{ev}</span>
                         </div>
                       ))}
                     </div>

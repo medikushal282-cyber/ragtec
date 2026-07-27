@@ -37,9 +37,11 @@ def generate_payload():
         severity = random.choices(SEVERITIES, weights=[0.1, 0.3, 0.4, 0.2], k=1)[0]
 
     return {
+        "name": f"Simulated {threat_type} Vulnerability",
         "type": threat_type,
         "origin": random.choice(ORIGINS),
         "severity": severity,
+        "solution": "Enforce strict vector index isolation, token length limits, and EDR behavior monitoring.",
         "ts": datetime.now().strftime("%H:%M:%S")
     }
 

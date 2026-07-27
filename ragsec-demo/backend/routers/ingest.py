@@ -25,9 +25,17 @@ async def ingest_alert(threat_in: schemas.ThreatCreate, db: Session = Depends(ge
     if not threat_data.get("ts"):
         threat_data["ts"] = datetime.datetime.now().strftime("%H:%M:%S")
 
-    # 2. Save to database
-    db_threat = models.Threat(**threat_data)
-    db.add(db_threat)
+    # 2. Save or Update in database (Upsert)
+    db_threat = db.query(models.Threat).filter(models.Threat.id == threat_data["id"]).first()
+    if db_threat:
+        # Update existing record
+        for key, value in threat_data.items():
+            setattr(db_threat, key, value)
+    else:
+        # Create new record
+        db_threat = models.Threat(**threat_data)
+        db.add(db_threat)
+        
     db.commit()
     db.refresh(db_threat)
 

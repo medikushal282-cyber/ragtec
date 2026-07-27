@@ -1,0 +1,1 @@
+{"name": "vulnerable-app", "dependencies": {"lodash": "^4.17.15", "axios": "^0.21.0"}}

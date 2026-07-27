@@ -36,8 +36,12 @@ def run_simulation():
             # Pick a random vulnerability to simulate "discovering" it
             vuln = random.choice(vulnerabilities)
             
-            # All CISA KEVs are Critical/High by definition of being actively exploited
-            severity = random.choices(["Critical", "High"], weights=[0.8, 0.2], k=1)[0]
+            # Simulating varied severities across the CISA feed for dashboard variety
+            severity = random.choices(
+                ["Critical", "High", "Medium", "Low", "Resolved"], 
+                weights=[0.4, 0.3, 0.15, 0.1, 0.05], 
+                k=1
+            )[0]
             
             payload = {
                 "id": vuln.get("cveID"),

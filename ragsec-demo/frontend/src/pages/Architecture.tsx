@@ -1,80 +1,104 @@
-import { motion } from 'framer-motion';
-import { Card } from '../components/ui/Card';
-import { Database, Server, Cpu, Shield, Layers, FileSearch, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import { fetchPipelineTopology } from '../lib/api';
 
 export default function Architecture() {
-  const flowSteps = [
-    { id: 1, title: 'Threat Feeds', icon: Database, desc: 'Heterogeneous security telemetry and reports' },
-    { id: 2, title: 'Processing & Indexing', icon: Layers, desc: 'Parsing, chunking, and metadata tagging (Severity, Trust)' },
-    { id: 3, title: 'Vector Database', icon: Server, desc: 'Semantic embeddings storage' },
-    { id: 4, title: 'Time-Aware Retrieval', icon: FileSearch, desc: 'Ranks chunks by Sim + Time + Risk + Trust' },
-    { id: 5, title: 'Grounded LLM', icon: Cpu, desc: 'Generates evidence-backed responses and citations' },
-    { id: 6, title: 'SOC Dashboard', icon: Shield, desc: 'Presents verified intelligence to analysts' }
-  ];
+  const [pipelineData, setPipelineData] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+
+  useEffect(() => {
+    fetchPipelineTopology().then((data) => {
+      setPipelineData(data);
+      setSelectedNode(data.nodes[0]);
+    }).catch(console.error);
+  }, []);
 
   return (
-    <div className="max-w-4xl mx-auto py-12 animate-in fade-in duration-500">
-      <header className="text-center mb-16">
-        <h1 className="text-4xl font-extrabold mb-4">RAGSec Architecture</h1>
-        <p className="text-gray-400 text-lg">An enterprise-grade retrieval pipeline designed for high-stakes security operations.</p>
+    <div className="space-y-8 max-w-6xl mx-auto animate-in fade-in duration-500 w-full min-w-0 pb-12">
+      <header className="text-center mb-12 space-y-2">
+        <h1 className="text-3xl font-extrabold uppercase tracking-widest text-on-surface">Data Pipeline Architecture</h1>
+        <p className="text-outline max-w-2xl mx-auto text-sm">
+          Click any system component node to inspect its technical details, dependencies, and real-time data flow.
+        </p>
       </header>
 
-      <div className="relative">
-        {/* Animated Connecting Line */}
-        <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/50 to-accent/50 -translate-x-1/2 z-0 hidden md:block" />
+      {/* Interactive System Graph */}
+      <div className="glass-panel p-8 relative overflow-hidden rounded-xl">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[300px] bg-primary-fixed/5 rounded-full blur-[100px] pointer-events-none"></div>
 
-        <div className="space-y-8 relative z-10">
-          {flowSteps.map((step, index) => {
-            const isEven = index % 2 === 0;
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+          {pipelineData?.nodes.map((node: any, i: number) => {
+            const isSelected = selectedNode?.id === node.id;
             return (
-              <motion.div 
-                key={step.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                className={`flex flex-col md:flex-row items-center gap-8 ${isEven ? '' : 'md:flex-row-reverse'}`}
+              <motion.div
+                key={node.id}
+                onClick={() => setSelectedNode(node)}
+                whileHover={{ y: -5 }}
+                className={`p-5 rounded-xl border border-dashed cursor-pointer transition-all magnetic-target group ${
+                  isSelected
+                    ? 'bg-primary-fixed/20 border-primary-fixed/50 shadow-[0_0_20px_rgba(0,219,233,0.15)]'
+                    : 'bg-black/40 border-white/10 hover:border-primary-fixed/30 hover:bg-white/5'
+                }`}
               >
-                {/* Card Side */}
-                <div className={`w-full md:w-1/2 ${isEven ? 'md:text-right' : 'text-left'}`}>
-                  <Card className={`inline-block w-full md:w-80 p-6 ${index === 3 ? 'glow-cyan border-primary/50' : ''}`}>
-                    <div className={`flex items-center gap-4 mb-2 ${isEven ? 'md:justify-end' : ''}`}>
-                      {isEven && <h3 className="text-xl font-bold">{step.title}</h3>}
-                      <div className={`p-3 rounded-xl bg-surface border border-white/10 ${index === 3 ? 'text-primary border-primary/30' : 'text-gray-300'}`}>
-                        <step.icon className="w-6 h-6" />
-                      </div>
-                      {!isEven && <h3 className="text-xl font-bold">{step.title}</h3>}
-                    </div>
-                    <p className="text-gray-400 text-sm mt-2">{step.desc}</p>
-                  </Card>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+                      isSelected ? 'bg-primary-fixed text-black' : 'bg-white/10 text-outline group-hover:text-primary-fixed'
+                  }`}>
+                    <span className="material-symbols-outlined text-[20px]">{node.icon}</span>
+                  </div>
+                  <h4 className={`font-bold text-xs uppercase tracking-wider ${isSelected ? 'text-primary-fixed' : 'text-on-surface'}`}>
+                      {node.title}
+                  </h4>
                 </div>
-
-                {/* Center Node */}
-                <div className="hidden md:flex w-12 h-12 rounded-full bg-background border-4 border-surface items-center justify-center relative z-20">
-                  <div className={`w-4 h-4 rounded-full ${index === 3 ? 'bg-primary shadow-[0_0_10px_#00d2ff]' : 'bg-gray-500'}`} />
-                </div>
-
-                {/* Empty Side for layout */}
-                <div className="hidden md:block w-1/2" />
+                <p className="text-[11px] text-outline leading-relaxed">{node.desc}</p>
               </motion.div>
             );
           })}
         </div>
       </div>
-      
-      <motion.div 
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ delay: 0.8 }}
-        className="mt-16 text-center"
-      >
-        <Card glow="cyan" className="max-w-2xl mx-auto bg-primary/5 border-primary/20">
-          <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
-          <h3 className="text-2xl font-bold mb-2">Future Ready</h3>
-          <p className="text-gray-400">This architecture is designed to integrate seamlessly with Pinecone/ChromaDB for vector storage and PostgreSQL for structured relational data in production deployments.</p>
-        </Card>
-      </motion.div>
+
+      {/* Selected Node Details Panel */}
+      <AnimatePresence mode="wait">
+          <motion.div 
+            key={selectedNode.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="glass-panel p-6 rounded-xl relative overflow-hidden border-primary-fixed/30 bg-black/40"
+          >
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-primary-fixed/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="flex items-start justify-between relative z-10">
+                <div>
+                    <div className="flex items-center gap-3 mb-2">
+                    <span className="material-symbols-outlined text-[24px] text-primary-fixed">{selectedNode.icon}</span>
+                    <h3 className="text-xl font-bold text-on-surface uppercase tracking-widest">{selectedNode.title}</h3>
+                    </div>
+                    <p className="text-sm text-outline mb-6 max-w-2xl">{selectedNode.desc}</p>
+                </div>
+                <span className="text-[10px] font-mono text-primary-fixed px-3 py-1 bg-primary-fixed/10 border border-primary-fixed/30 rounded flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary-fixed animate-pulse"></span>
+                    OPERATIONAL
+                </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+                <div className="p-4 rounded-lg bg-black/50 border border-dashed border-white/10">
+                    <span className="text-[10px] text-outline font-mono uppercase block mb-1">Component ID</span>
+                    <span className="text-sm text-on-surface font-mono">{selectedNode.id}</span>
+                </div>
+                <div className="p-4 rounded-lg bg-black/50 border border-dashed border-white/10">
+                    <span className="text-[10px] text-outline font-mono uppercase block mb-1">Communication Protocol</span>
+                    <span className="text-sm text-secondary-fixed font-mono">REST / WebSockets</span>
+                </div>
+                <div className="p-4 rounded-lg bg-black/50 border border-dashed border-white/10">
+                    <span className="text-[10px] text-outline font-mono uppercase block mb-1">Data Processing</span>
+                    <span className="text-sm text-secondary-container font-mono">Real-time (Low Latency)</span>
+                </div>
+            </div>
+          </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

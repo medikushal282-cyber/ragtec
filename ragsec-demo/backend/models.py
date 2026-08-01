@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Float, JSON, ForeignKey, Boolean
+from sqlalchemy.orm import relationship
 from database import Base
 import datetime
 
@@ -14,9 +15,6 @@ class Threat(Base):
     exceptions = Column(String) # Notes or exceptions
     ts = Column(String) # Date added / Date formatted
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-from sqlalchemy import ForeignKey, Float, JSON
-from sqlalchemy.orm import relationship
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
@@ -44,3 +42,85 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     session = relationship("ChatSession", back_populates="messages")
+
+class Playbook(Base):
+    __tablename__ = "playbooks"
+    id = Column(String, primary_key=True, index=True)
+    title = Column(String)
+    category = Column(String)
+    severity = Column(String)
+    description = Column(String)
+    steps = Column(JSON)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class Patch(Base):
+    __tablename__ = "patches"
+    id = Column(String, primary_key=True, index=True)
+    vendor = Column(String)
+    description = Column(String)
+    severity = Column(String)
+    status = Column(String) # Pending, Rolling Out, Completed
+    progress = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class KBDocument(Base):
+    __tablename__ = "kb_documents"
+    id = Column(String, primary_key=True, index=True)
+    title = Column(String)
+    category = Column(String)
+    content = Column(String)
+    status = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class Setting(Base):
+    __tablename__ = "settings"
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String)
+    description = Column(String)
+
+class ScanHistory(Base):
+    __tablename__ = "scan_history"
+    id = Column(String, primary_key=True, index=True)
+    path = Column(String) # Target (IP, URL, File Path)
+    scan_type = Column(String, default="File Scan") # e.g. Network, Malware, Phishing, Vulnerability
+    status = Column(String)
+    findings = Column(JSON)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class SystemMetric(Base):
+    __tablename__ = "system_metrics"
+    id = Column(String, primary_key=True, index=True)
+    cpu_usage = Column(Float)
+    memory_usage = Column(Float)
+    active_threats = Column(Float)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+class PipelineNode(Base):
+    __tablename__ = "pipeline_nodes"
+    id = Column(String, primary_key=True, index=True)
+    title = Column(String)
+    icon = Column(String)
+    desc = Column(String)
+    status = Column(String, default="active")
+
+# RAGSec+ Enterprise Additions
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(String, primary_key=True, index=True)
+    user = Column(String, default="system")
+    action_type = Column(String) # e.g. "READ", "WRITE", "SCAN", "RETRIEVE", "INGEST"
+    resource = Column(String)
+    details = Column(String)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+class NetworkFlag(Base):
+    __tablename__ = "network_flags"
+    id = Column(String, primary_key=True, index=True)
+    source_ip = Column(String)
+    destination_ip = Column(String)
+    flag_type = Column(String) # e.g. "Lateral Movement", "Beaconing", "Exfiltration"
+    severity = Column(String)
+    description = Column(String)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)

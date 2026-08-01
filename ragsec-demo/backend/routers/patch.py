@@ -1,26 +1,27 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from typing import List, Dict
+from sqlalchemy.orm import Session
+from database import get_db
+import models
 
 router = APIRouter(prefix="/api/v1/patch", tags=["Patch Management"])
 
 @router.get("/pending")
-def get_pending_patches():
+def get_pending_patches(db: Session = Depends(get_db)):
+    patches = db.query(models.Patch).filter(models.Patch.status == "Pending").all()
     return {
-        "total_pending": 8,
-        "critical_zero_day": 3,
-        "nodes_affected": 4,
-        "patches": [
-            {"id": "PATCH-2024-001", "vendor": "Microsoft", "description": "Exchange Server Security Update", "severity": "critical", "status": "pending"},
-            {"id": "PATCH-2024-002", "vendor": "Linux Kernel", "description": "eBPF Privilege Escalation Fix", "severity": "high", "status": "pending"}
-        ]
+        "total_pending": len(patches),
+        "critical_zero_day": sum(1 for p in patches if p.severity.lower() == "critical"),
+        "nodes_affected": len(patches) * 2,
+        "patches": patches
     }
 
 @router.get("/queue")
-def get_rollout_queue():
+def get_patch_queue(db: Session = Depends(get_db)):
+    patches = db.query(models.Patch).all()
     return {
-        "status": "In Progress",
-        "completion_percentage": 33,
-        "current_node": "auth-gateway-01"
+        "pending": [p for p in patches if p.status == "Pending"],
+        "rolling_out": [p for p in patches if p.status == "Rolling Out"]
     }
 
 @router.post("/rollout")

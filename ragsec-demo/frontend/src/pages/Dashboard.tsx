@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useApp } from '../context/AppContext';
 import { fetchAnalyticsHistorical, fetchTelemetry, TelemetryData } from '../lib/api';
+import GlobalThreatMap from '../components/GlobalThreatMap';
+import LogStreamer from '../components/LogStreamer';
 
 export default function Dashboard() {
   const { threats, openDrawer, systemStatus } = useApp();
@@ -136,6 +138,26 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+      {/* New Threat Map and Log Streamer Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="glass-panel rounded-xl p-6 flex flex-col h-[400px] transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+            <h3 className="text-sm font-bold uppercase tracking-wider mb-4 text-on-surface flex items-center">
+                <span className="material-symbols-outlined mr-2 text-primary-fixed">public</span> Global Threat Origins
+            </h3>
+            <div className="flex-1 min-h-[300px]">
+                <GlobalThreatMap threats={threats} />
+            </div>
+        </div>
+
+        <div className="glass-panel rounded-xl p-6 flex flex-col h-[400px] transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+            <h3 className="text-sm font-bold uppercase tracking-wider mb-4 text-on-surface flex items-center">
+                <span className="material-symbols-outlined mr-2 text-secondary-fixed">terminal</span> Live SIEM Stream
+            </h3>
+            <div className="flex-1 min-h-[300px]">
+                <LogStreamer />
+            </div>
         </div>
       </div>
 

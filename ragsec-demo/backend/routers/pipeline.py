@@ -1,29 +1,32 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from database import get_db
+import models
 
-router = APIRouter(prefix="/api/v1/pipeline", tags=["Data Pipeline"])
+router = APIRouter(prefix="/api/v1/pipeline", tags=["Pipeline"])
 
 @router.get("/topology")
-def get_topology():
+def get_topology(db: Session = Depends(get_db)):
+    nodes = db.query(models.PipelineNode).all()
+    # Mocking edges for visualization
+    edges = [
+        {"source": "cisa", "target": "ingest"},
+        {"source": "ingest", "target": "db"},
+        {"source": "ingest", "target": "ws"},
+        {"source": "db", "target": "rerank"},
+        {"source": "rerank", "target": "copilot"},
+        {"source": "copilot", "target": "soc"},
+        {"source": "ws", "target": "soc"}
+    ]
     return {
         "nodes": [
-            {"id": "ingest-1", "type": "ingestion", "status": "active", "label": "CloudTrail Log Stream"},
-            {"id": "ingest-2", "type": "ingestion", "status": "active", "label": "CrowdStrike Falcon Events"},
-            {"id": "process-1", "type": "processing", "status": "active", "label": "IoC Extractor (NLP)"},
-            {"id": "store-1", "type": "storage", "status": "active", "label": "ChromaDB Vectors"},
-            {"id": "store-2", "type": "storage", "status": "active", "label": "PostgreSQL Metadata"}
+            {
+                "id": n.id,
+                "title": n.title,
+                "icon": n.icon,
+                "desc": n.desc,
+                "status": n.status
+            } for n in nodes
         ],
-        "edges": [
-            {"source": "ingest-1", "target": "process-1"},
-            {"source": "ingest-2", "target": "process-1"},
-            {"source": "process-1", "target": "store-1"},
-            {"source": "process-1", "target": "store-2"}
-        ]
-    }
-
-@router.get("/metrics")
-def get_pipeline_metrics():
-    return {
-        "events_per_second": 3450,
-        "latency_ms": 12,
-        "backlog_size": 0
+        "edges": edges
     }

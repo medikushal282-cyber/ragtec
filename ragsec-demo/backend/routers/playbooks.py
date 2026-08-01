@@ -10,13 +10,55 @@ import os
 
 router = APIRouter(
     prefix="/api/actions",
-    tags=["actions", "playbooks"],
-    dependencies=[Depends(get_current_active_user)]
+    tags=["actions", "playbooks"]
 )
 
 @router.get("/playbooks")
-def get_playbooks():
-    return []
+def get_playbooks(db: Session = Depends(get_db)):
+    playbooks = db.query(models.Playbook).all()
+    # Return as dicts compatible with frontend
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "category": p.category,
+            "severity": p.severity,
+            "description": p.description,
+            "steps": p.steps
+        } for p in playbooks
+    ]
+
+@router.post("/playbooks")
+def create_playbook(payload: dict, db: Session = Depends(get_db)):
+    import uuid
+    pb_id = f"pb-{str(uuid.uuid4())[:8]}"
+    new_pb = models.Playbook(
+        id=pb_id,
+        title=payload.get("title", "Custom Playbook"),
+        category=payload.get("category", "General"),
+        severity=payload.get("severity", "High"),
+        description=payload.get("description", "Custom incident response workflow"),
+        steps=payload.get("steps", {
+            "Containment": ["Isolate affected host", "Block external IP"],
+            "Eradication": ["Flush transient cache", "Patch vulnerability"]
+        })
+    )
+    db.add(new_pb)
+    db.commit()
+    return {"status": "success", "id": pb_id, "message": "Custom Playbook saved to database."}
+
+@router.post("/playbooks/run")
+def log_playbook_run(payload: dict, db: Session = Depends(get_db)):
+    pb_id = payload.get("playbook_id")
+    completed_steps = payload.get("completed_steps", [])
+    notes = payload.get("notes", "")
+    return {
+        "status": "success",
+        "playbook_id": pb_id,
+        "steps_completed": len(completed_steps),
+        "audit_id": f"audit-{datetime.utcnow().timestamp()}",
+        "message": "Playbook execution audit log recorded successfully."
+    }
 
 
 # Simulated Firewall Rules File

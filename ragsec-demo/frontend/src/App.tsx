@@ -11,32 +11,18 @@ import Dashboard from './pages/Dashboard';
 import ThreatFeed from './pages/ThreatFeed';
 import AIAssistant from './pages/AIAssistant';
 import RetrievalDemo from './pages/RetrievalDemo';
-import Architecture from './pages/Architecture';
-import Analytics from './pages/Analytics';
-import Playbooks from './pages/Playbooks';
-import PatchManagement from './pages/PatchManagement';
-import Investigation from './pages/Investigation';
-import APIExplorer from './pages/APIExplorer';
-import KnowledgeBase from './pages/KnowledgeBase';
-import SystemStatus from './pages/SystemStatus';
 import SettingsPage from './pages/SettingsPage';
 import ScannerDashboard from './pages/ScannerDashboard';
+import AdvancedScanner from './pages/AdvancedScanner';
+import AuditLogs from './pages/AuditLogs';
 import Login from './pages/Login';
 import GodUIMenuPreview from './pages/GodUIMenuPreview';
 import { GodUIAppShell } from './godui/layouts/GodUIAppShell';
 import { GodUIDashboard } from './godui/pages/GodUIDashboard';
 import { GodUIAssistant } from './godui/pages/GodUIAssistant';
 import { GodUIThreatFeed } from './godui/pages/GodUIThreatFeed';
-import { GodUIInvestigation } from './godui/pages/GodUIInvestigation';
 import { GodUIScanner } from './godui/pages/GodUIScanner';
 import { GodUIRetrieval } from './godui/pages/GodUIRetrieval';
-import { GodUIAnalytics } from './godui/pages/GodUIAnalytics';
-import { GodUIPlaybooks } from './godui/pages/GodUIPlaybooks';
-import { GodUIPatchManagement } from './godui/pages/GodUIPatchManagement';
-import { GodUIArchitecture } from './godui/pages/GodUIArchitecture';
-import { GodUIKnowledgeBase } from './godui/pages/GodUIKnowledgeBase';
-import { GodUIAPIExplorer } from './godui/pages/GodUIAPIExplorer';
-import { GodUISystemStatus } from './godui/pages/GodUISystemStatus';
 import { GodUISettings } from './godui/pages/GodUISettings';
 import { GodUILanding } from './godui/pages/GodUILanding';
 import { GodUILogin } from './godui/pages/GodUILogin';
@@ -44,10 +30,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
   return <AppProvider>{children}</AppProvider>;
 };
 
@@ -62,11 +44,11 @@ function AnimatedRoutes() {
           path="/"
           element={
             <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.02 }}
-              transition={{ duration: 0.4 }}
-              className="w-full h-full absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full min-h-screen"
             >
               <LandingPage />
             </motion.div>
@@ -78,11 +60,11 @@ function AnimatedRoutes() {
           path="/login"
           element={
             <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.02 }}
-              transition={{ duration: 0.4 }}
-              className="w-full h-full absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full min-h-screen"
             >
               <Login />
             </motion.div>
@@ -94,11 +76,11 @@ function AnimatedRoutes() {
           path="/godui-preview"
           element={
             <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.02 }}
-              transition={{ duration: 0.4 }}
-              className="w-full h-full absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full min-h-screen"
             >
               <GodUIMenuPreview />
             </motion.div>
@@ -111,11 +93,11 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <motion.div
-                initial={{ opacity: 0, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, filter: 'blur(10px)' }}
-                transition={{ duration: 0.4 }}
-                className="w-full h-full absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="w-full h-screen overflow-hidden"
               >
                 <AppShell>
                 <Routes>
@@ -123,16 +105,10 @@ function AnimatedRoutes() {
                   <Route path="feed" element={<ThreatFeed />} />
                   <Route path="assistant" element={<AIAssistant />} />
                   <Route path="demo" element={<RetrievalDemo />} />
-                  <Route path="analytics" element={<Analytics />} />
-                  <Route path="playbooks" element={<Playbooks />} />
-                  <Route path="patch" element={<PatchManagement />} />
-                  <Route path="investigation" element={<Investigation />} />
-                  <Route path="forensics" element={<Architecture />} />
-                  <Route path="api-explorer" element={<APIExplorer />} />
-                  <Route path="knowledge-base" element={<KnowledgeBase />} />
-                  <Route path="system-status" element={<SystemStatus />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="scanner" element={<ScannerDashboard />} />
+                  <Route path="advanced-scanner" element={<AdvancedScanner />} />
+                  <Route path="audit" element={<AuditLogs />} />
                 </Routes>
               </AppShell>
               </motion.div>
@@ -154,17 +130,11 @@ function AnimatedRoutes() {
           <Route path="dashboard" element={<GodUIDashboard />} />
           <Route path="assistant" element={<GodUIAssistant />} />
           <Route path="feed" element={<GodUIThreatFeed />} />
-          <Route path="investigation" element={<GodUIInvestigation />} />
           <Route path="scanner" element={<GodUIScanner />} />
           <Route path="retrieval" element={<GodUIRetrieval />} />
-          <Route path="analytics" element={<GodUIAnalytics />} />
-          <Route path="playbooks" element={<GodUIPlaybooks />} />
-          <Route path="patch" element={<GodUIPatchManagement />} />
-          <Route path="architecture" element={<GodUIArchitecture />} />
-          <Route path="knowledge-base" element={<GodUIKnowledgeBase />} />
-          <Route path="api" element={<GodUIAPIExplorer />} />
-          <Route path="status" element={<GodUISystemStatus />} />
           <Route path="settings" element={<GodUISettings />} />
+          <Route path="audit" element={<AuditLogs />} />
+          <Route path="advanced-scanner" element={<AdvancedScanner />} />
         </Route>
       </Routes>
     </AnimatePresence>

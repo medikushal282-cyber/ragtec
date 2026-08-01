@@ -1,13 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { fetchKBDocuments } from '../lib/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { fetchKBDocuments, uploadKBDocument } from '../lib/api';
 
 export default function KnowledgeBase() {
   const [search, setSearch] = useState('');
   const [documents, setDocuments] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadDocs = () => {
+    fetchKBDocuments().then(setDocuments).catch(console.error);
+  };
 
   useEffect(() => {
-    fetchKBDocuments().then(setDocuments).catch(console.error);
+    loadDocs();
   }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      await uploadKBDocument(file);
+      loadDocs();
+      alert(`Successfully ingested '${file.name}' into vector database!`);
+    } catch (err) {
+      alert('Failed to upload file');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const filtered = documents.filter((item) =>
     item.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -60,12 +82,27 @@ export default function KnowledgeBase() {
 
             {/* Ingestion Drop Zone */}
             <div className="glass-panel p-6 rounded-xl border-dashed border-2 border-outline/30 hover:border-primary-fixed/50 transition-colors flex flex-col items-center justify-center text-center group cursor-none magnetic-target min-h-[250px]">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileUpload} 
+                  className="hidden" 
+                  accept=".txt,.pdf,.json,.stix"
+                />
                 <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4 group-hover:bg-primary-fixed/10 group-hover:text-primary-fixed group-hover:scale-110 transition-all">
-                    <span className="material-symbols-outlined text-[24px]">upload_file</span>
+                    <span className={`material-symbols-outlined text-[24px] ${isUploading ? 'animate-spin text-primary-fixed' : ''}`}>
+                      {isUploading ? 'sync' : 'upload_file'}
+                    </span>
                 </div>
                 <h3 className="text-sm font-bold text-on-surface mb-2">Ingest Threat Intel</h3>
                 <p className="text-xs text-outline mb-4">Drag and drop PDFs, STIX/TAXII JSON, or raw text to embed.</p>
-                <button className="kinetic-btn px-6 py-2 rounded text-xs font-bold uppercase cursor-none">Browse Files</button>
+                <button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={isUploading}
+                  className="kinetic-btn px-6 py-2 rounded text-xs font-bold uppercase cursor-none disabled:opacity-50"
+                >
+                  {isUploading ? 'Embedding Vector...' : 'Browse Files'}
+                </button>
             </div>
         </div>
 

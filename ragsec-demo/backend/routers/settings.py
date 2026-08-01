@@ -1,23 +1,30 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from database import get_db
+import models
 
-router = APIRouter(prefix="/api/v1/settings", tags=["System Settings"])
+router = APIRouter(prefix="/api/v1/settings", tags=["Settings"])
 
 @router.get("/profile")
-def get_profile():
+def get_profile(db: Session = Depends(get_db)):
+    username_setting = db.query(models.Setting).filter(models.Setting.key == "admin_username").first()
+    theme_setting = db.query(models.Setting).filter(models.Setting.key == "theme").first()
     return {
-        "username": "admin",
+        "username": username_setting.value if username_setting else "Administrator",
         "role": "Super Admin",
-        "mfa_enabled": True,
-        "last_login": "2026-07-27T10:00:00Z"
+        "theme": theme_setting.value if theme_setting else "dark"
     }
 
-@router.get("/keys")
-def get_api_keys():
-    return [
-        {"id": "key-01", "name": "Grafana Integration", "created_at": "2026-01-15", "last_used": "2 mins ago"},
-        {"id": "key-02", "name": "SIEM Forwarder", "created_at": "2026-03-22", "last_used": "Just now"}
-    ]
-
-@router.post("/keys/generate")
-def generate_key(payload: dict):
-    return {"status": "success", "message": "API Key generated", "key": "ragsec_tk_xxxxxxxxxxxxxxxx"}
+@router.post("/profile")
+def update_profile(payload: dict, db: Session = Depends(get_db)):
+    username_setting = db.query(models.Setting).filter(models.Setting.key == "admin_username").first()
+    theme_setting = db.query(models.Setting).filter(models.Setting.key == "theme").first()
+    
+    if username_setting and "username" in payload:
+        username_setting.value = payload["username"]
+    
+    if theme_setting and "theme" in payload:
+        theme_setting.value = payload["theme"]
+        
+    db.commit()
+    return {"status": "success"}

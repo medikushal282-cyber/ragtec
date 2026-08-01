@@ -29,6 +29,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [activeToast, setActiveToast] = useState<Notification | null>(null);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -64,6 +65,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           read: false,
         };
         setNotifications((prev) => [newNotif, ...prev]);
+        setActiveToast(newNotif);
+        setTimeout(() => setActiveToast(null), 4000);
       }
     });
 
@@ -110,6 +113,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }}
     >
       {children}
+      {activeToast && (
+        <div className="fixed bottom-6 right-6 z-[9999] bg-secondary-container/90 border border-secondary-container text-black font-bold p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300">
+          <span className="material-symbols-outlined text-[24px]">warning</span>
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-black/70">CRITICAL WEBSOCKET ALERT</div>
+            <div className="text-xs">{activeToast.message}</div>
+          </div>
+          <button onClick={() => setActiveToast(null)} className="ml-4 hover:opacity-70">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
     </AppContext.Provider>
   );
 };

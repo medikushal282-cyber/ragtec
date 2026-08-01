@@ -22,9 +22,11 @@ def get_models():
         resp.raise_for_status()
         data = resp.json()
         models = [m.get("name") for m in data.get("models", [])]
+        if "llama3.2-vision:latest" not in models and "llama3.2-vision" not in models:
+            models.append("llama3.2-vision")
         return {"models": models}
     except Exception as e:
-        return {"models": ["llama3.2"]} # Fallback
+        return {"models": ["llama3.2", "llama3.2-vision"]} # Fallback
 
 
 class ChatRequest(BaseModel):

@@ -215,7 +215,8 @@ export async function fetchFolderScan(path: string): Promise<any> {
 export async function postRetrieve(
   query: string,
   useRagsec: boolean,
-  weights?: { sim?: number; recency?: number; severity?: number; trust?: number }
+  weights?: { sim?: number; recency?: number; severity?: number; trust?: number },
+  iamRole?: string
 ): Promise<RetrieveResult[]> {
   return apiFetch<RetrieveResult[]>('/api/retrieve/', {
     method: 'POST',
@@ -226,7 +227,16 @@ export async function postRetrieve(
       recency_weight: weights?.recency,
       severity_weight: weights?.severity,
       trust_weight: weights?.trust,
+      iamRole
     }),
+  });
+}
+
+// ─── Feedback ────────────────────────────────────────────────────────────────
+export async function submitFeedback(rating: number, upvote: boolean): Promise<any> {
+  return apiFetch('/api/system/feedback', {
+    method: 'POST',
+    body: JSON.stringify({ rating, upvote, timestamp: new Date().toISOString() })
   });
 }
 
@@ -383,5 +393,46 @@ export const fetchPipelineTopology = async () => {
 export const fetchSettingsProfile = async () => {
   const response = await fetch(`${API_BASE}/api/v1/settings/profile`);
   if (!response.ok) throw new Error('Failed to fetch settings profile');
+  return response.json();
+};
+
+export const updateSettingsProfile = async (payload: { username?: string; theme?: string; mandatoryFeedback?: boolean; iamRole?: string; strictMasking?: boolean }) => {
+  const response = await fetch(`${API_BASE}/api/v1/settings/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to update settings profile');
+  return response.json();
+};
+
+export const createPlaybook = async (payload: { title: string; category: string; severity: string; description: string; steps?: any }) => {
+  const response = await fetch(`${API_BASE}/api/actions/playbooks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to create playbook');
+  return response.json();
+};
+
+export const runPlaybook = async (payload: { playbook_id: string; completed_steps: string[]; notes?: string }) => {
+  const response = await fetch(`${API_BASE}/api/actions/playbooks/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to log playbook run');
+  return response.json();
+};
+
+export const uploadKBDocument = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${API_BASE}/api/v1/kb/upload`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) throw new Error('Failed to upload document to KB');
   return response.json();
 };

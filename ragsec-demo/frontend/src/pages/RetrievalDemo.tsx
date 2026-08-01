@@ -240,6 +240,19 @@ export default function RetrievalDemo() {
                   }`}>
                     Final Hybrid Score: <span className="text-xs">{item.scores?.final}</span>
                   </div>
+
+                  {/* Vector Match Score Contribution Heatmap */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[9px] font-mono text-gray-400">
+                      <span>Vector Scoring Breakdown Heatmap</span>
+                    </div>
+                    <div className="h-2 w-full bg-black/60 rounded-full overflow-hidden flex border border-white/10">
+                      <div style={{ width: `${(item.scores?.similarity || 0.8) * 40}%` }} className="bg-secondary-fixed h-full" title="Similarity Contribution" />
+                      <div style={{ width: `${(item.scores?.recency || 0.9) * 30}%` }} className="bg-primary-fixed h-full" title="Time Recency Contribution" />
+                      <div style={{ width: `${(item.scores?.severity || 0.7) * 20}%` }} className="bg-secondary-container h-full" title="Severity Risk Contribution" />
+                      <div style={{ width: `${(item.scores?.trust || 0.9) * 10}%` }} className="bg-primary-container h-full" title="Domain Trust Contribution" />
+                    </div>
+                  </div>
                 </motion.div>
               ))}
             </AnimatePresence>

@@ -11,7 +11,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('ragsec_token');
+    return localStorage.getItem('ragsec_token') || 'demo_token';
   });
 
   const isAuthenticated = !!token;

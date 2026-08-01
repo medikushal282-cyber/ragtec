@@ -3,6 +3,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { FolderSearch, AlertTriangle, ShieldCheck, Play, Loader2 } from 'lucide-react';
+import { API_BASE } from '../lib/utils';
 
 export default function ScannerDashboard() {
   const [isScanning, setIsScanning] = useState(false);
@@ -13,7 +14,7 @@ export default function ScannerDashboard() {
     setIsScanning(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:8000/api/scanner/scan-directory');
+      const res = await fetch(`${API_BASE}/api/scanner/scan-directory`);
       if (!res.ok) throw new Error('Failed to reach backend scanner.');
       const data = await res.json();
       setScanResults(data);

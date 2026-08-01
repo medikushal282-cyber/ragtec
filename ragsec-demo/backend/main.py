@@ -11,6 +11,10 @@ from database import SessionLocal
 # Create all database tables
 models.Base.metadata.create_all(bind=engine)
 
+# Seed database
+from seeder import seed_database
+seed_database()
+
 app = FastAPI(
     title="RAGSec+ Enterprise Threat Intelligence API",
     description="Backend API powering RAGSec+ SOC Command Center",
@@ -29,13 +33,19 @@ def cleanup_old_threats():
     finally:
         db.close()
 
+from cisa_ingester import fetch_and_ingest_cisa_kev
+from network_detector import generate_network_anomaly
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(cleanup_old_threats, 'interval', days=1)
+scheduler.add_job(fetch_and_ingest_cisa_kev, 'interval', hours=2)
+scheduler.add_job(generate_network_anomaly, 'interval', minutes=1)
 
 @app.on_event("startup")
 async def startup_event():
     scheduler.start()
     await manager.start()
+    fetch_and_ingest_cisa_kev()
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -44,7 +54,7 @@ def shutdown_event():
 # CORS middleware (Phase 2: Restricted CORS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,6 +64,8 @@ app.add_middleware(
 from routers import auth_router
 app.include_router(auth_router.router)
 app.include_router(ingest.router)
+from routers import ingest_pipeline
+app.include_router(ingest_pipeline.router)
 app.include_router(threats.router)
 app.include_router(chat.router)
 app.include_router(retrieve.router)

@@ -6,40 +6,38 @@ import models
 import datetime
 from collections import defaultdict
 
-router = APIRouter(
-    prefix="/api/analytics",
-    tags=["analytics"],
-)
+router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 @router.get("/historical")
 def get_historical(db: Session = Depends(get_db)):
-    # Group threats by date over the last 7 days.
-    # In SQLite, we can group by date(created_at)
     today = datetime.datetime.now().date()
     seven_days_ago = today - datetime.timedelta(days=7)
-    
-    # We will just fetch all and group in Python for simplicity, 
-    # since SQLite date functions can be tricky with ISO formats.
     threats = db.query(models.Threat).all()
-    
     counts_by_date = defaultdict(int)
     for t in threats:
         if t.created_at:
             d = t.created_at.date()
             if d >= seven_days_ago:
-                # Use a string format for frontend e.g. "Mon"
-                day_name = d.strftime("%a")
-                counts_by_date[day_name] += 1
+                counts_by_date[d.strftime("%a")] += 1
                 
-    # Ensure all days are present
     days = [(today - datetime.timedelta(days=i)).strftime("%a") for i in range(6, -1, -1)]
-    
-    timeData = []
-    for day in days:
-        # Give it a baseline of a few threats if DB is empty so the chart doesn't look blank
-        timeData.append({
-            "name": day,
-            "threats": counts_by_date.get(day, 0) + (10 if counts_by_date.get(day, 0) == 0 else 0)
-        })
-        
-    return timeData
+    return [{"name": day, "threats": counts_by_date.get(day, 0) + (10 if counts_by_date.get(day, 0) == 0 else 0)} for day in days]
+
+@router.get("/trending")
+def get_trending(db: Session = Depends(get_db)):
+    threats = db.query(models.Threat).all()
+    # Count by type
+    counts = defaultdict(int)
+    for t in threats:
+        counts[t.type if t.type else "Unknown"] += 1
+    return [{"name": k, "value": v} for k, v in counts.items()]
+
+@router.get("/vendors")
+def get_vendors(db: Session = Depends(get_db)):
+    threats = db.query(models.Threat).all()
+    counts = defaultdict(int)
+    for t in threats:
+        vendor = t.name.split()[0] if t.name else "Other"
+        if len(vendor) < 3: vendor = "Other"
+        counts[vendor] += 1
+    return [{"name": k, "value": v} for k, v in counts.items()]

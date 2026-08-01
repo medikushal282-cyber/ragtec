@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Lock, User, Loader2 } from 'lucide-react';
+import { API_BASE } from '../lib/utils';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -21,7 +22,7 @@ export default function Login() {
       formData.append('username', username);
       formData.append('password', password);
 
-      const res = await fetch('http://localhost:8000/api/auth/token', {
+      const res = await fetch(`${API_BASE}/api/auth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData.toString()
@@ -111,7 +112,7 @@ export default function Login() {
                 formData.append('username', 'admin');
                 formData.append('password', 'ragsec2026');
 
-                const res = await fetch('http://localhost:8000/api/auth/token', {
+                const res = await fetch(`${API_BASE}/api/auth/token`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                   body: formData.toString()

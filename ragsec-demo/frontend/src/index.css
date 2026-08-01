@@ -1,5 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --border-dim: #222222;
+  --accent: #e8d44d;
+  --accent-glow: rgba(232, 212, 77, 0.5);
+  --text-dim: #444444;
+  --text-mid: #888888;
+  --text-bright: #cccccc;
+  --icon-bg: #181818;
+}
 
 @tailwind base;
 @tailwind components;
@@ -7,17 +19,32 @@
 
 @layer base {
   body {
-    background-color: #0A0A0A;
-    color: #e5e2e1;
+    background-color: var(--bg);
+    color: var(--text-mid);
     overflow-x: hidden;
-    cursor: none; /* Hide default cursor for magnetic cursor */
     /* Grid Background */
     background-image: 
         linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
     background-size: 40px 40px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'JetBrains Mono', monospace;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
+  
+  html.light-theme body {
+    background-color: #0f172a;
+    color: #f8fafc;
+  }
+}
+
+@keyframes spin-dash {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes tube-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%       { opacity: 1; }
 }
 
 @layer components {

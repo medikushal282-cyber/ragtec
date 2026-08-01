@@ -80,8 +80,9 @@ app.include_router(knowledge_base.router)
 app.include_router(pipeline.router)
 app.include_router(settings.router)
 
-from routers import scanner
+from routers import scanner, enterprise
 app.include_router(scanner.router)
+app.include_router(enterprise.router)
 
 @app.get("/")
 def read_root():

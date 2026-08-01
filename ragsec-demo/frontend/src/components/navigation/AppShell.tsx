@@ -9,9 +9,10 @@ import { DockNav } from './DockNav';
 const DOCK_ITEMS = [
   { label: 'Dashboard', path: '/app/dashboard', icon: 'dashboard' },
   { label: 'Threat Feed', path: '/app/feed', icon: 'monitoring' },
+  { label: 'Network', path: '/app/network', icon: 'dns' },
   { label: 'Scanner', path: '/app/scanner', icon: 'search' },
   { label: 'AI Copilot', path: '/app/assistant', icon: 'smart_toy' },
-  { label: 'Retrieval', path: '/app/demo', icon: 'manage_search' },
+  { label: 'Audit Logs', path: '/app/audit', icon: 'manage_search' },
   { label: 'Settings', path: '/app/settings', icon: 'settings' },
 ];
 

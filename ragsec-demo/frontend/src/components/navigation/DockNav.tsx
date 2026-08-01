@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Activity, Package, Cpu, ScrollText, Settings } from 'lucide-react';
+import { Home, Activity, Package, Cpu, ScrollText, Settings, Server } from 'lucide-react';
 import { Dock, DockIcon, DockItem, DockLabel } from '../ui/dock';
 
 const iconMap: Record<string, any> = {
@@ -10,6 +10,7 @@ const iconMap: Record<string, any> = {
   'smart_toy': Cpu,
   'manage_search': ScrollText,
   'settings': Settings,
+  'dns': Server, // For Enterprise Network
 };
 
 interface NavItem {

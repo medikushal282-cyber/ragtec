@@ -6,9 +6,10 @@ import { DockNav } from '../../components/navigation/DockNav';
 const DOCK_ITEMS = [
   { label: 'Executive Dashboard', path: '/v3/dashboard', icon: 'dashboard' },
   { label: 'Threat Intel Feed', path: '/v3/feed', icon: 'monitoring' },
+  { label: 'Enterprise Network', path: '/v3/network', icon: 'dns' },
   { label: 'Local Scanner', path: '/v3/scanner', icon: 'search' },
   { label: 'AI Threat Copilot', path: '/v3/assistant', icon: 'smart_toy' },
-  { label: 'Time-Aware Retrieval', path: '/v3/retrieval', icon: 'manage_search' },
+  { label: 'Compliance & Audit', path: '/v3/audit', icon: 'manage_search' },
   { label: 'Settings', path: '/v3/settings', icon: 'settings' },
 ];
 

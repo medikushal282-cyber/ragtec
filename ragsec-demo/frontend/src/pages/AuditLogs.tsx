@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Shield, Clock, FileText, Activity, Database, CheckSquare } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Shield, Clock, FileText, Activity, Database, CheckSquare, Download, Network, Mail, Lock, Globe, Server, Cpu, Radar, Fingerprint } from 'lucide-react';
+import { InteractiveHoverButton } from '../components/ui/InteractiveHoverButton';
+import { generateMockLog } from '../utils/mockLogs';
 
 interface AuditLog {
   id: string;
@@ -13,9 +15,12 @@ interface AuditLog {
 export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [useMockData, setUseMockData] = useState(false);
+  const mockIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     const fetchLogs = async () => {
+      if (useMockData) return; // Skip fetching real logs if mock is enabled
       try {
         const res = await fetch('http://localhost:8000/api/system/audit');
         if (res.ok) {
@@ -28,16 +33,58 @@ export default function AuditLogs() {
         setLoading(false);
       }
     };
+
     fetchLogs();
     const interval = setInterval(fetchLogs, 5000); // Poll every 5s
-    return () => clearInterval(interval);
-  }, []);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [useMockData]);
+
+  useEffect(() => {
+    if (useMockData) {
+      // Clear existing real logs and start pushing mocks
+      setLogs([]);
+      setLoading(false);
+      
+      // Push one immediately
+      setLogs(prev => [generateMockLog(), ...prev]);
+
+      mockIntervalRef.current = setInterval(() => {
+        setLogs(prev => {
+          const newLog = generateMockLog();
+          const next = [newLog, ...prev];
+          if (next.length > 50) next.pop(); // Keep array from growing infinitely
+          return next;
+        });
+      }, 3500); // New log every 3.5 seconds
+    } else {
+      if (mockIntervalRef.current) {
+        clearInterval(mockIntervalRef.current);
+      }
+    }
+
+    return () => {
+      if (mockIntervalRef.current) clearInterval(mockIntervalRef.current);
+    };
+  }, [useMockData]);
 
   const getActionIcon = (type: string) => {
     switch (type) {
       case 'SCAN': return <Activity className="w-4 h-4 text-cyber-cyan" />;
       case 'RETRIEVE': return <Database className="w-4 h-4 text-purple-400" />;
       case 'INGEST': return <CheckSquare className="w-4 h-4 text-green-400" />;
+      case 'MITIGATE': return <Shield className="w-4 h-4 text-red-400" />;
+      case 'NETWORK': return <Network className="w-4 h-4 text-blue-400" />;
+      case 'EMAIL': return <Mail className="w-4 h-4 text-yellow-400" />;
+      case 'FIREWALL': return <Lock className="w-4 h-4 text-orange-500" />;
+      case 'DNS': return <Globe className="w-4 h-4 text-cyan-500" />;
+      case 'AUTH': return <Fingerprint className="w-4 h-4 text-purple-500" />;
+      case 'IDS_IPS': return <Radar className="w-4 h-4 text-red-500" />;
+      case 'WEB_SERVER': return <Server className="w-4 h-4 text-indigo-400" />;
+      case 'EDR': return <Cpu className="w-4 h-4 text-green-500" />;
+      case 'THREAT_INTEL': return <Database className="w-4 h-4 text-gray-300" />;
       default: return <FileText className="w-4 h-4 text-gray-400" />;
     }
   };
@@ -51,6 +98,40 @@ export default function AuditLogs() {
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Compliance & Audit Trail</h1>
           <p className="text-sm text-gray-400 font-mono mt-1">Immutable SOC action logs in accordance with ISO27001 / GDPR compliance.</p>
+        </div>
+        <div className="ml-auto flex items-center gap-4">
+          
+          {/* Mock Data Toggle */}
+          <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-4 py-2 rounded-full">
+            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">
+              Live Network Simulator
+            </span>
+            <button 
+              onClick={() => {
+                setUseMockData(!useMockData);
+                setLoading(true);
+              }}
+              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${useMockData ? 'bg-cyber-cyan' : 'bg-gray-700'}`}
+            >
+              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${useMockData ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <InteractiveHoverButton 
+            text="Export CSV" 
+            onClick={() => {
+              const csvData = [
+                ['Timestamp', 'Action', 'Resource', 'User', 'Details'],
+                ...logs.map(l => [new Date(l.timestamp).toLocaleString(), l.action_type, l.resource, l.user, l.details])
+              ].map(e => e.join(",")).join("\n");
+              const blob = new Blob([csvData], { type: 'text/csv' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `audit-logs-${new Date().toISOString()}.csv`;
+              a.click();
+            }}
+          />
         </div>
       </div>
 
@@ -98,7 +179,13 @@ export default function AuditLogs() {
                     <td className="px-6 py-4 text-gray-400 truncate max-w-xs">{log.resource}</td>
                     <td className="px-6 py-4 text-gray-400">{log.user}</td>
                     <td className="px-6 py-4 text-gray-400 truncate max-w-md" title={log.details}>
-                      {log.details}
+                      {log.details.includes('[THREAT]') ? (
+                        <span className="text-red-400 font-bold bg-red-900/20 px-2 py-0.5 rounded">{log.details}</span>
+                      ) : log.details.includes('[SUSPICIOUS]') ? (
+                        <span className="text-orange-400 font-bold bg-orange-900/20 px-2 py-0.5 rounded">{log.details}</span>
+                      ) : (
+                        log.details
+                      )}
                     </td>
                   </tr>
                 ))

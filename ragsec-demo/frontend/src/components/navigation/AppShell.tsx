@@ -5,6 +5,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { InvestigationDrawer } from '../ui/InvestigationDrawer';
 import { CommandPalette } from '../ui/CommandPalette';
 import { DockNav } from './DockNav';
+import { SettingsModal } from '../ui/SettingsModal';
 
 const DOCK_ITEMS = [
   { label: 'Dashboard', path: '/app/dashboard', icon: 'dashboard' },
@@ -13,7 +14,6 @@ const DOCK_ITEMS = [
   { label: 'Scanner', path: '/app/scanner', icon: 'search' },
   { label: 'AI Copilot', path: '/app/assistant', icon: 'smart_toy' },
   { label: 'Audit Logs', path: '/app/audit', icon: 'manage_search' },
-  { label: 'Settings', path: '/app/settings', icon: 'settings' },
 ];
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -23,6 +23,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setCommandPaletteOpen
   } = useApp();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const location = useLocation();
 
   // Helper to format breadcrumb
@@ -93,7 +94,10 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 <NotificationCenter isOpen={notifOpen} onClose={() => setNotifOpen(false)} />
             </div>
             
-            <button className="text-outline hover:text-primary-fixed transition-colors magnetic-target">
+            <button 
+              onClick={() => setSettingsOpen(true)}
+              className="text-outline hover:text-primary-fixed transition-colors magnetic-target"
+            >
                 <span className="material-symbols-outlined">settings</span>
             </button>
           </div>
@@ -107,6 +111,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
       <InvestigationDrawer />
       <CommandPalette />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 };

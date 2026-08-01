@@ -15,8 +15,17 @@ interface AuditLog {
 export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [useMockData, setUseMockData] = useState(false);
+  const [useMockData, setUseMockData] = useState(() => localStorage.getItem('demoMode') === 'true');
   const mockIntervalRef = useRef<any>(null);
+
+  useEffect(() => {
+    const handleDemoChange = () => {
+      setUseMockData(localStorage.getItem('demoMode') === 'true');
+      setLoading(true);
+    };
+    window.addEventListener('demoModeChanged', handleDemoChange);
+    return () => window.removeEventListener('demoModeChanged', handleDemoChange);
+  }, []);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -101,21 +110,15 @@ export default function AuditLogs() {
         </div>
         <div className="ml-auto flex items-center gap-4">
           
-          {/* Mock Data Toggle */}
-          <div className="flex items-center gap-2 bg-black/40 border border-white/10 px-4 py-2 rounded-full">
-            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">
-              Live Network Simulator
-            </span>
-            <button 
-              onClick={() => {
-                setUseMockData(!useMockData);
-                setLoading(true);
-              }}
-              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none ${useMockData ? 'bg-cyber-cyan' : 'bg-gray-700'}`}
-            >
-              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${useMockData ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-          </div>
+          {/* Global Demo Status */}
+          {useMockData && (
+            <div className="flex items-center gap-2 bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan px-4 py-2 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-cyber-cyan animate-pulse"></span>
+              <span className="text-xs font-mono font-bold uppercase tracking-widest">
+                Live Network Simulator Active
+              </span>
+            </div>
+          )}
 
           <InteractiveHoverButton 
             text="Export CSV" 

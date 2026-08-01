@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DockNav } from '../../components/navigation/DockNav';
+import { SettingsModal } from '../../components/ui/SettingsModal';
 
 const DOCK_ITEMS = [
   { label: 'Executive Dashboard', path: '/v3/dashboard', icon: 'dashboard' },
@@ -10,11 +11,11 @@ const DOCK_ITEMS = [
   { label: 'Local Scanner', path: '/v3/scanner', icon: 'search' },
   { label: 'AI Threat Copilot', path: '/v3/assistant', icon: 'smart_toy' },
   { label: 'Compliance & Audit', path: '/v3/audit', icon: 'manage_search' },
-  { label: 'Settings', path: '/v3/settings', icon: 'settings' },
 ];
 
 export const GodUIAppShell: React.FC = () => {
     const location = useLocation();
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     // Helper to format breadcrumb
     const getBreadcrumbs = () => {
@@ -88,7 +89,10 @@ export const GodUIAppShell: React.FC = () => {
                             <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-primary-fixed rounded-full border-2 border-black shadow-[0_0_8px_rgba(0,240,255,0.8)]"></span>
                         </button>
                         
-                        <button className="w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/50 hover:text-white hover:border-white/30 hover:bg-white/10 transition-all">
+                        <button 
+                          onClick={() => setSettingsOpen(true)}
+                          className="w-10 h-10 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-white/50 hover:text-white hover:border-white/30 hover:bg-white/10 transition-all"
+                        >
                             <span className="material-symbols-outlined text-[20px]">settings</span>
                         </button>
                     </div>
@@ -110,6 +114,8 @@ export const GodUIAppShell: React.FC = () => {
                     </AnimatePresence>
                 </main>
             </div>
+            
+            <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
         </div>
     );
 };

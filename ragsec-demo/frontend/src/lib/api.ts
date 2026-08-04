@@ -206,6 +206,57 @@ export async function postChat(
   });
 }
 
+// ─── RAGSec Grounded Ask ─────────────────────────────────────────────────────
+export interface AskCitation {
+  label: string;       // "C1", "C2" etc.
+  source_type: string;
+  similarity: number;
+  snippet: string;
+  url?: string | null;
+  title?: string;
+  published_date?: string;
+}
+
+export interface AskResponse {
+  status: 'answered' | 'abstained';
+  // answered fields
+  answer?: string;
+  provider?: string;
+  flagged?: boolean;
+  citations?: AskCitation[];
+  verification?: {
+    cited_count: number;
+    total_sentences: number;
+    uncited_sentences: string[];
+  };
+  retrieval_metrics?: {
+    avg_top3_similarity: number;
+    distinct_sources: number;
+    surviving_count: number;
+  };
+  // abstained fields
+  abstention_reason?: string;
+  nearest_chunks?: Array<{
+    label: string;
+    source_type: string;
+    similarity: number;
+    snippet: string;
+    url?: string | null;
+    title?: string;
+  }>;
+}
+
+export async function postAsk(
+  query: string,
+  model: string = 'llama3.2',
+  allowed_tiers: string[] = ['public', 'internal']
+): Promise<AskResponse> {
+  return apiFetch<AskResponse>('/api/ask/', {
+    method: 'POST',
+    body: JSON.stringify({ query, model, allowed_tiers }),
+  });
+}
+
 // ─── Scanner ────────────────────────────────────────────────────────────────
 export async function fetchFolderScan(path: string): Promise<any> {
   return apiFetch(`/api/scanner/folder?path=${encodeURIComponent(path)}`);

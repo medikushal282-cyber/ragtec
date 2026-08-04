@@ -11,7 +11,7 @@ try:
     from sentence_transformers import SentenceTransformer
     chroma_client = chromadb.Client()
     collection = chroma_client.get_or_create_collection(name="threat_intel")
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    embedder = None
     CHROMA_AVAILABLE = True
 except Exception as e:
     CHROMA_AVAILABLE = False

@@ -5,17 +5,17 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
-  postChat, 
+  postAsk, 
   fetchFolderScan, 
   fetchSessions, 
   fetchSessionHistory, 
   deleteSession,
   submitFeedback,
   fetchSettingsProfile,
-  ChatResponse, 
-  ChatSession 
+  ChatSession,
+  AskCitation,
 } from '../lib/api';
-import { Check, Copy, Bot, Terminal, ShieldAlert, Sparkles, ThumbsUp, ThumbsDown, Star } from 'lucide-react';
+import { Check, Copy, Bot, Terminal, ShieldAlert, Sparkles, ThumbsUp, ThumbsDown, Star, BookOpen, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
 export default function AIAssistant() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -40,6 +40,7 @@ export default function AIAssistant() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [activeCitation, setActiveCitation] = useState<AskCitation | null>(null);
 
   const [availableModels, setAvailableModels] = useState<string[]>(['llama3.2', 'llama3.2-vision', 'gemini-1.5-pro']);
   const [isModelsLoading, setIsModelsLoading] = useState(true);
@@ -224,36 +225,57 @@ export default function AIAssistant() {
     setIsLoading(true);
 
     const steps = [
-      'Searching SQLite DB & CISA Feeds...',
-      'Retrieving Evidence Vectors...',
-      'Executing Cross-Encoder Reranking...',
-      'Synthesizing Mitigation Checklist...',
+      '🔍 Embedding query with bge-small-en-v1.5...',
+      '📚 Searching Chroma vector store...',
+      '⚖️  Applying θ_sim / θ_conf confidence gates...',
+      '🛡️  Masking sensitive fields in evidence...',
+      '✍️  Generating grounded, cited response...',
     ];
 
     for (let i = 0; i < steps.length; i++) {
       setPipelineStage(steps[i]);
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 600));
     }
 
     const startTime = Date.now();
 
     try {
-      const data: ChatResponse = await postChat(text, selectedModel, messages, currentImage || undefined, activeSessionId || undefined);
+      const data = await postAsk(text, selectedModel);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2) + 's';
-      if (data.session_id && !activeSessionId) {
-        setActiveSessionId(data.session_id);
-        loadSessions();
+
+      if (data.status === 'abstained') {
+        setMessages((prev) => [...prev, {
+          role: 'assistant',
+          status: 'abstained',
+          content: `**Abstained** — Not enough verified evidence to answer confidently.\n\n> ${data.abstention_reason}`,
+          nearest_chunks: data.nearest_chunks || [],
+          latency: elapsed,
+          citations: [],
+          flagged: false,
+          verification: null,
+        }]);
+      } else {
+        setMessages((prev) => [...prev, {
+          role: 'assistant',
+          status: 'answered',
+          content: data.answer || '',
+          citations: data.citations || [],
+          flagged: data.flagged || false,
+          verification: data.verification || null,
+          retrieval_metrics: data.retrieval_metrics || null,
+          provider: data.provider || 'unknown',
+          latency: elapsed,
+        }]);
       }
-      setMessages((prev) => [...prev, { ...data, latency: elapsed }]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Failed to communicate with RAGSec Copilot API engine.',
-          confidence: 0,
+          status: 'error',
+          content: 'Failed to communicate with RAGSec pipeline API.',
+          citations: [],
           latency: '0.05s',
-          evidence: [],
         },
       ]);
     } finally {
@@ -398,15 +420,31 @@ export default function AIAssistant() {
               {/* Message Content Container */}
               <div className={`max-w-[88%] space-y-3 ${msg.role === 'user' ? 'items-end flex flex-col' : ''}`}>
                 
-                {/* Assistant Output Header Bar (🤖 ANALYSIS COMPLETE · 1.24s) */}
+                {/* Assistant Output Header Bar */}
                 {msg.role === 'assistant' && (
-                  <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400 tracking-wider">
+                  <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400 tracking-wider flex-wrap">
                     <span className="text-cyber-cyan font-bold flex items-center gap-1">
                       <Bot className="w-3.5 h-3.5 text-cyber-cyan" />
-                      ANALYSIS COMPLETE
+                      {msg.status === 'abstained' ? 'ABSTAINED' : msg.status === 'error' ? 'ERROR' : 'ANALYSIS COMPLETE'}
                     </span>
                     <span>·</span>
                     <span className="text-gray-400">{msg.latency || '1.18s'}</span>
+                    {/* Verification Badge */}
+                    {msg.status === 'answered' && (
+                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        msg.flagged
+                          ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400'
+                          : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                      }`}>
+                        {msg.flagged ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+                        {msg.flagged ? 'FLAGGED' : 'VERIFIED'}
+                      </span>
+                    )}
+                    {msg.status === 'abstained' && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-red-500/15 border-red-500/40 text-red-400">
+                        <XCircle className="w-3 h-3" /> ABSTAINED
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -422,190 +460,112 @@ export default function AIAssistant() {
                     {msg.content}
                   </div>
                 ) : (
-                  /* Assistant SOC Response Panel */
-                  <div className="p-4 rounded-xl text-sm leading-relaxed bg-[#0b0e14] border border-white/10 text-gray-200 space-y-4 shadow-2xl">
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        // Custom Pill Badges for Hostnames, Severities, and MITRE Codes
-                        code({node, inline, className, children, ...props}: any) {
-                          const codeStr = String(children).replace(/\n$/, '');
-                          const match = /language-(\w+)/.exec(className || '');
-
-                          if (!inline && (match || className === 'language-log' || codeStr.includes('\n'))) {
-                            return (
-                              <div className="relative group/code my-3 rounded-lg overflow-hidden border border-white/15 bg-[#05070a]">
-                                <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 border-b border-white/10 text-[10px] font-mono text-gray-400">
-                                  <span className="flex items-center gap-1 text-cyber-cyan">
-                                    <Terminal className="w-3 h-3" /> Telemetry Log Output
-                                  </span>
-                                  <button
-                                    onClick={() => handleCopyCode(codeStr, idx)}
-                                    className="hover:text-white flex items-center gap-1 text-gray-400 transition-colors"
-                                    title="Copy Code"
-                                  >
-                                    {copiedIdx === idx ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-400" />
-                                        <span className="text-emerald-400">Copied</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-3 h-3" />
-                                        <span>Copy</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                                <SyntaxHighlighter
-                                  {...props}
-                                  children={codeStr}
-                                  style={atomDark}
-                                  language={match ? match[1] : 'bash'}
-                                  PreTag="div"
-                                  className="!bg-transparent !p-4 !m-0 font-mono text-xs text-gray-300 leading-relaxed"
-                                />
-                              </div>
-                            );
-                          }
-
-                          // Styled Badges: Severity vs MITRE ATT&CK vs Entity Pill
-                          if (codeStr === 'CRITICAL' || codeStr.includes('CRITICAL')) {
-                            return (
-                              <span className="inline-flex items-center gap-1 bg-[#ff3344]/20 text-[#ff3344] border border-[#ff3344]/40 px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase mx-1">
-                                <ShieldAlert className="w-3 h-3" /> CRITICAL
-                              </span>
-                            );
-                          }
-
-                          if (codeStr.startsWith('[T') || codeStr.includes('Valid Accounts') || codeStr.includes('Admin Shares')) {
-                            return (
-                              <span className="inline-flex items-center gap-1 bg-[#00f0ff]/15 text-[#00f0ff] border border-[#00f0ff]/30 px-2.5 py-0.5 rounded text-[11px] font-mono font-semibold mx-1">
-                                {codeStr}
-                              </span>
-                            );
-                          }
-
-                          // Verified Entity Highlighting
-                          if (codeStr.startsWith('WS-') || codeStr.includes('10.0.') || codeStr.includes('SVC_')) {
-                            return (
-                              <span className="inline-flex items-center px-2 py-0.5 bg-green-500/20 text-green-400 border border-green-500/40 rounded text-[11px] font-mono font-bold mx-1" title="Verified in RAG Corpus">
-                                ✓ {codeStr}
-                              </span>
-                            );
-                          }
-                          
-                          // Unverified / Hallucination Risk Entity Highlighting
-                          if (codeStr.includes('Unknown') || codeStr.includes('Unverified') || codeStr.includes('Novel')) {
-                            if (strictMasking) {
-                              return <span className="inline-flex items-center px-2 py-0.5 bg-gray-500/20 text-gray-400 border border-gray-500/40 rounded text-[11px] font-mono font-bold mx-1" title="Masked due to strict policy">[REDACTED]</span>
-                            }
-                            return (
-                              <span className="inline-flex items-center px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/40 rounded text-[11px] font-mono font-bold mx-1" title="Unverified/Hallucination Risk">
-                                ⚠ {codeStr}
-                              </span>
-                            );
-                          }
-
-                          return (
-                            <code {...props} className="bg-black/60 border border-white/10 rounded px-1.5 py-0.5 text-cyber-cyan font-mono text-xs mx-0.5">
-                              {children}
-                            </code>
-                          );
-                        },
-                        strong({children}) {
-                          const str = String(children);
-                          // Verified Entity Highlighting
-                          if (str.startsWith('WS-') || str.includes('10.0.') || str.includes('SVC_')) {
-                            return (
-                              <span className="inline-flex items-center px-2 py-0.5 bg-green-500/20 text-green-400 border border-green-500/40 rounded text-[11px] font-mono font-bold mx-1" title="Verified in RAG Corpus">
-                                ✓ {str}
-                              </span>
-                            );
-                          }
-                          // Unverified / Hallucination Risk Entity Highlighting
-                          if (str.includes('Unknown') || str.includes('Unverified') || str.includes('Novel')) {
-                            if (strictMasking) {
-                              return <span className="inline-flex items-center px-2 py-0.5 bg-gray-500/20 text-gray-400 border border-gray-500/40 rounded text-[11px] font-mono font-bold mx-1" title="Masked due to strict policy">[REDACTED]</span>
-                            }
-                            return (
-                              <span className="inline-flex items-center px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/40 rounded text-[11px] font-mono font-bold mx-1" title="Unverified/Hallucination Risk">
-                                ⚠ {str}
-                              </span>
-                            );
-                          }
-                          return <strong className="font-bold text-white">{children}</strong>;
-                        },
-                        a({children, href}) {
-                          return <a href={href} target="_blank" rel="noreferrer" className="text-cyber-cyan hover:underline">{children}</a>
-                        }
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  </div>
-                )}
-
-                {/* Structured AI Output Panel */}
-                {msg.role === 'assistant' && (msg.executive_summary || msg.evidence?.length > 0) && (
-                  <div className="bg-[#0b0e14] border border-white/15 p-4 rounded-xl space-y-3 text-xs text-gray-300">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                      <div className="flex items-center gap-2 text-cyber-cyan font-bold font-mono uppercase">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Confidence: {((msg.confidence || 0.97) * 100).toFixed(1)}%</span>
-                      </div>
-                      <span className="text-[9px] px-2 py-0.5 border border-white/20 rounded text-gray-400 font-mono">VERIFIED</span>
-                    </div>
-
-                    {msg.is_zero_day === 'True' || msg.is_zero_day === true ? (
-                      <div className="p-2.5 bg-[#ff3344]/15 border border-[#ff3344]/40 rounded-lg text-[#ff3344] font-bold flex items-center gap-2">
-                        <ShieldAlert className="w-4 h-4" /> 
-                        ZERO DAY ALERT: Immediate Containment Recommended
-                      </div>
-                    ) : null}
-
-                    {msg.technical_analysis && (
-                      <div>
-                        <span className="font-mono text-gray-400 uppercase font-bold block mb-1">Technical Analysis:</span>
-                        <p className="text-gray-200">{msg.technical_analysis}</p>
-                      </div>
-                    )}
-
-                    {msg.immediate_mitigation && msg.immediate_mitigation.length > 0 && (
-                      <div>
-                        <span className="font-mono text-cyber-cyan uppercase font-bold block mb-1.5">Mitigation Checklist:</span>
-                        <ul className="space-y-1.5 text-gray-200">
-                          {msg.immediate_mitigation.map((m: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <span className="text-cyber-cyan font-bold">✓</span>
-                              {m}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    
-                    {/* SOC Analyst Feedback Loop (User Trust Rating) */}
-                    <div className="pt-3 mt-3 border-t border-white/10 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-mono uppercase text-gray-500">Analyst Trust Rating:</span>
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map(star => (
-                            <button key={star} onClick={() => handleFeedback(idx, star, true)} disabled={feedbackState[idx]} className={`transition-colors ${feedbackState[idx] ? 'text-cyber-yellow' : 'text-gray-600 hover:text-cyber-yellow'}`} title={`Rate ${star}/5`}>
-                              <Star className="w-4 h-4" />
-                            </button>
-                          ))}
+                  /* Assistant Response Panel */
+                  <div className="space-y-3">
+                    {/* Abstention Panel */}
+                    {msg.status === 'abstained' && (
+                      <div className="p-4 rounded-xl bg-[#1a0e0e] border border-red-500/30 space-y-3">
+                        <div className="flex items-center gap-2 text-red-400 font-bold text-xs font-mono uppercase">
+                          <XCircle className="w-4 h-4" />
+                          Insufficient Evidence — Cannot Answer
                         </div>
+                        <p className="text-gray-300 text-sm">{msg.nearest_chunks?.length ? `Nearest related sources (below confidence threshold):` : `No related evidence found in corpus.`}</p>
+                        {(msg.nearest_chunks || []).map((nc: any, ni: number) => (
+                          <div key={ni} className="p-2.5 bg-black/40 border border-white/10 rounded-lg text-xs text-gray-400 font-mono">
+                            <span className="text-yellow-400 font-bold">[{nc.label}] [{nc.source_type?.toUpperCase()}]</span>
+                            <span className="ml-2 text-gray-500">sim={nc.similarity?.toFixed(3)}</span>
+                            <p className="mt-1 text-gray-400 leading-relaxed">{nc.snippet}</p>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleFeedback(idx, 5, true)} disabled={feedbackState[idx]} className={`transition-colors ${feedbackState[idx] ? 'text-green-400' : 'text-gray-500 hover:text-green-400'}`}>
-                          <ThumbsUp className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleFeedback(idx, 1, false)} disabled={feedbackState[idx]} className={`transition-colors ${feedbackState[idx] ? 'text-red-400' : 'text-gray-500 hover:text-red-400'}`}>
-                          <ThumbsDown className="w-4 h-4" />
-                        </button>
+                    )}
+
+                    {/* Answered Panel */}
+                    {(msg.status === 'answered' || !msg.status) && (
+                      <div className="p-4 rounded-xl text-sm leading-relaxed bg-[#0b0e14] border border-white/10 text-gray-200 space-y-4 shadow-2xl">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code({node, inline, className, children, ...props}: any) {
+                              const codeStr = String(children).replace(/\n$/, '');
+                              const match = /language-(\w+)/.exec(className || '');
+                              if (!inline && (match || codeStr.includes('\n'))) {
+                                return (
+                                  <div className="relative group/code my-3 rounded-lg overflow-hidden border border-white/15 bg-[#05070a]">
+                                    <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 border-b border-white/10 text-[10px] font-mono text-gray-400">
+                                      <span className="flex items-center gap-1 text-cyber-cyan"><Terminal className="w-3 h-3" /> Output</span>
+                                      <button onClick={() => handleCopyCode(codeStr, idx)} className="hover:text-white flex items-center gap-1 text-gray-400 transition-colors">
+                                        {copiedIdx === idx ? <><Check className="w-3 h-3 text-emerald-400" /><span className="text-emerald-400">Copied</span></> : <><Copy className="w-3 h-3" /><span>Copy</span></>}
+                                      </button>
+                                    </div>
+                                    <SyntaxHighlighter {...props} children={codeStr} style={atomDark} language={match ? match[1] : 'bash'} PreTag="div" className="!bg-transparent !p-4 !m-0 font-mono text-xs text-gray-300 leading-relaxed" />
+                                  </div>
+                                );
+                              }
+                              // Render [C1], [C2] citation tags as clickable chips
+                              if (/^\[C\d+\]$/.test(codeStr)) {
+                                const citIdx = parseInt(codeStr.replace('[C','').replace(']','')) - 1;
+                                const cit = msg.citations?.[citIdx];
+                                return (
+                                  <button
+                                    onClick={() => cit && setActiveCitation(cit)}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-cyber-cyan/15 text-cyber-cyan border border-cyber-cyan/40 rounded text-[10px] font-mono font-bold mx-0.5 hover:bg-cyber-cyan/25 transition-colors cursor-pointer"
+                                    title={cit ? `${cit.source_type}: ${cit.snippet?.slice(0, 80)}` : 'Unknown source'}
+                                  >
+                                    <BookOpen className="w-2.5 h-2.5" />{codeStr}
+                                  </button>
+                                );
+                              }
+                              if (codeStr === 'CRITICAL' || codeStr.includes('CRITICAL')) {
+                                return <span className="inline-flex items-center gap-1 bg-[#ff3344]/20 text-[#ff3344] border border-[#ff3344]/40 px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase mx-1"><ShieldAlert className="w-3 h-3" /> CRITICAL</span>;
+                              }
+                              return <code {...props} className="bg-black/60 border border-white/10 rounded px-1.5 py-0.5 text-cyber-cyan font-mono text-xs mx-0.5">{children}</code>;
+                            },
+                            strong({children}) {
+                              return <strong className="font-bold text-white">{children}</strong>;
+                            },
+                            a({children, href}) {
+                              return <a href={href} target="_blank" rel="noreferrer" className="text-cyber-cyan hover:underline">{children}</a>;
+                            }
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+
+                        {/* Citation strip */}
+                        {msg.citations && msg.citations.length > 0 && (
+                          <div className="pt-3 border-t border-white/10">
+                            <p className="text-[10px] font-mono uppercase text-gray-500 mb-2">Evidence Sources</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {msg.citations.map((cit: AskCitation, ci: number) => (
+                                <button
+                                  key={ci}
+                                  onClick={() => setActiveCitation(cit)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30 rounded text-[10px] font-mono hover:bg-cyber-cyan/20 transition-colors"
+                                >
+                                  <BookOpen className="w-2.5 h-2.5" />[{cit.label}] {cit.source_type} · {(cit.similarity * 100).toFixed(0)}%
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Verification rationale */}
+                        {msg.verification && (
+                          <div className="text-[10px] font-mono text-gray-500">
+                            {msg.verification.cited_count}/{msg.verification.total_sentences} sentences cited
+                            {msg.flagged && <span className="text-yellow-400 ml-2">&#9888; {msg.verification.uncited_sentences?.length} uncited claim(s) detected</span>}
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    )}
+
+                    {/* Error panel */}
+                    {msg.status === 'error' && (
+                      <div className="p-4 rounded-xl bg-[#0b0e14] border border-red-500/30 text-red-400 text-sm">
+                        {msg.content}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -680,6 +640,67 @@ export default function AIAssistant() {
           </form>
         </div>
       </div>
+
+      {/* Citation Detail Modal */}
+      <AnimatePresence>
+        {activeCitation && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setActiveCitation(null)}
+              className="fixed inset-0 bg-black/70 z-50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-lg bg-[#0d0f14] border border-cyber-cyan/30 rounded-2xl shadow-2xl p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-cyber-cyan" />
+                  <span className="text-cyber-cyan font-mono font-bold text-sm uppercase">[{activeCitation.label}] Evidence Source</span>
+                </div>
+                <button onClick={() => setActiveCitation(null)} className="text-gray-500 hover:text-white transition-colors">
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-2 text-xs font-mono">
+                <div className="flex gap-2">
+                  <span className="text-gray-500 w-20 shrink-0">Type:</span>
+                  <span className="text-cyber-cyan uppercase">{activeCitation.source_type}</span>
+                </div>
+                {activeCitation.title && (
+                  <div className="flex gap-2">
+                    <span className="text-gray-500 w-20 shrink-0">Title:</span>
+                    <span className="text-gray-200">{activeCitation.title}</span>
+                  </div>
+                )}
+                {activeCitation.published_date && (
+                  <div className="flex gap-2">
+                    <span className="text-gray-500 w-20 shrink-0">Date:</span>
+                    <span className="text-gray-300">{activeCitation.published_date}</span>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <span className="text-gray-500 w-20 shrink-0">Similarity:</span>
+                  <span className="text-emerald-400">{(activeCitation.similarity * 100).toFixed(1)}%</span>
+                </div>
+                {activeCitation.url && (
+                  <div className="flex gap-2">
+                    <span className="text-gray-500 w-20 shrink-0">URL:</span>
+                    <a href={activeCitation.url} target="_blank" rel="noreferrer" className="text-cyber-cyan hover:underline truncate">{activeCitation.url}</a>
+                  </div>
+                )}
+              </div>
+              <div className="bg-black/50 rounded-lg p-3 border border-white/10">
+                <p className="text-[10px] font-mono text-gray-500 uppercase mb-1">Chunk Text</p>
+                <p className="text-gray-300 text-xs leading-relaxed">{activeCitation.snippet}</p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

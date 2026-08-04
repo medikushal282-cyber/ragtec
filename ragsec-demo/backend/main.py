@@ -4,6 +4,7 @@ import models
 from database import engine
 from websocket_manager import manager
 from routers import ingest, threats, chat, retrieve, telemetry, analytics, system_status, notifications, investigation, playbooks, patch, knowledge_base, pipeline, settings
+from routers.ask import router as ask_router
 from apscheduler.schedulers.background import BackgroundScheduler
 import datetime
 from database import SessionLocal
@@ -79,6 +80,7 @@ app.include_router(patch.router)
 app.include_router(knowledge_base.router)
 app.include_router(pipeline.router)
 app.include_router(settings.router)
+app.include_router(ask_router)
 
 from routers import scanner, enterprise
 app.include_router(scanner.router)

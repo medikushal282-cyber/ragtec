@@ -124,3 +124,16 @@ class NetworkFlag(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+class IngestedDocument(Base):
+    __tablename__ = "ingested_documents"
+    id = Column(String, primary_key=True, index=True)
+    source_type = Column(String, index=True) # e.g. cve, mitre, synthetic, sop
+    title = Column(String)
+    body = Column(String)
+    published_date = Column(DateTime, nullable=True)
+    ingested_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sensitivity_tier = Column(String) # public, internal, restricted
+    url = Column(String, nullable=True)
+    content_hash = Column(String, unique=True, index=True) # for deduplication
+    chunked = Column(Boolean, default=False) # tracking for pipeline

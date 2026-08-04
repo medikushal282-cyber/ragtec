@@ -32,8 +32,7 @@ def get_network_flags(db: Session = Depends(get_db)):
 
 from fastapi import HTTPException
 from llm_engine import generate_mitigation
-from routers.retrieve import retrieve_chunks_internal
-
+from retrieval.retriever import retrieve_and_gate
 @router.get("/{id}/mitigate")
 def mitigate_threat(id: str, db: Session = Depends(get_db)):
     threat = db.query(models.Threat).filter(models.Threat.id == id).first()
@@ -42,7 +41,11 @@ def mitigate_threat(id: str, db: Session = Depends(get_db)):
         
     # RAGSec Internal Retrieval
     query = f"{threat.name} {threat.type} {threat.severity}"
-    chunks = retrieve_chunks_internal(query, limit=3)
+    retrieval_result = retrieve_and_gate(query)
+    
+    chunks = []
+    if retrieval_result["status"] == "sufficient":
+        chunks = [c["text"] for c in retrieval_result["chunks"][:3]]
     
     mitigation_data = generate_mitigation(
         threat_name=threat.name,

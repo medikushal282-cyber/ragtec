@@ -226,7 +226,6 @@ export function GodUIEnterprise() {
                           text={scanning && scanResult?.target === item.path ? "Scanning..." : "Deep Scan"} 
                           onClick={() => handleScan(item.path)}
                           disabled={scanning}
-                          className="!w-32 !py-1"
                         />
                       </div>
                     </motion.div>

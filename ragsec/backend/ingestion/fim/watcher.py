@@ -7,7 +7,7 @@ from ingestion.fim.scanner import generate_fim_event, get_file_hash
 
 class FIMEventHandler(FileSystemEventHandler):
     def __init__(self, ignore_patterns=None):
-        self.ignore_patterns = ignore_patterns or [".git", "node_modules", "__pycache__", ".gemini", "ragsec.db"]
+        self.ignore_patterns = ignore_patterns or [".git", "node_modules", "__pycache__", ".gemini", "ragsec.db", ".quarantine", "quarantine"]
         super().__init__()
 
     def _should_ignore(self, path):

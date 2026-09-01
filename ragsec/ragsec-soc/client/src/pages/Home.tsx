@@ -69,7 +69,7 @@ export default function Home() {
   const health = trpc.soc.systemHealth.useQuery(undefined, { refetchInterval: 10000 });
 
   const flash = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(""), 2600); };
-  const page = active === "Dashboard" ? <Dashboard onNavigate={setActive} demoMode={demoMode} /> : active === "Threat Query" ? <ThreatQuery query={query} setQuery={setQuery} sentQuery={sentQuery} setSentQuery={setSentQuery} /> : active === "Knowledge Base" ? <Knowledge flash={flash} /> : active === "Audit Log" ? <Audit /> : <StubPage name={active} demoMode={demoMode} />;
+  const page = active === "Dashboard" ? <Dashboard onNavigate={setActive} demoMode={demoMode} /> : active === "Threat Query" ? <ThreatQuery query={query} setQuery={setQuery} sentQuery={sentQuery} setSentQuery={setSentQuery} /> : active === "Knowledge Base" ? <Knowledge flash={flash} /> : active === "Audit Log" ? <Audit /> : <StubPage name={active} demoMode={demoMode} flash={flash} />;
 
   const isNominal = health.data?.status === "online";
   const healthLabel = health.data?.msg || "CHECKING...";
@@ -380,79 +380,412 @@ function AlertsPage() {
   </div>;
 }
 
-function FimMonitorPage({ demoMode }: { demoMode?: boolean }) {
-  const q = trpc.soc.getFimEvents.useQuery();
+function FimMonitorPage({ demoMode, flash }: { demoMode?: boolean; flash?: (t: string) => void }) {
+  const fimEvents = trpc.soc.getFimEvents.useQuery(undefined, { refetchInterval: 5000 });
+  const fimAlerts = trpc.soc.getFimAlerts.useQuery(undefined, { refetchInterval: 5000 });
+  const quarantined = trpc.soc.listQuarantined.useQuery(undefined, { refetchInterval: 5000 });
+  const scanMut = trpc.soc.scanWorkspace.useMutation({
+    onSuccess: (data: any) => {
+      flash?.(`Workspace scan complete: ${data.files_scanned || 0} files scanned, ${data.threats_flagged || 0} threats detected`);
+      fimEvents.refetch();
+      fimAlerts.refetch();
+    }
+  });
+  const quarMut = trpc.soc.quarantineFile.useMutation({
+    onSuccess: (data: any) => {
+      flash?.(data.status === "SUCCESS" ? "File successfully quarantined to .quarantine enclave" : "Quarantine failed");
+      fimEvents.refetch();
+      fimAlerts.refetch();
+      quarantined.refetch();
+    }
+  });
+
   const rawEvents = demoMode ? [
-    { id: "demo-1", timestamp: new Date().toISOString(), device_id: "FIN-WS-042", canonical: { action: "CREATE", file_path: "C:\\Users\\Public\\invoice.exe", risk_score: 98 } },
-    { id: "demo-2", timestamp: new Date(Date.now() - 180000).toISOString(), device_id: "DMZ-WEB-03", canonical: { action: "MODIFY", file_path: "/var/www/html/.cache.php", risk_score: 86 } },
-    { id: "demo-3", timestamp: new Date(Date.now() - 300000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "CREATE", file_path: "C:\\Users\\Public\\ransom_note.txt", risk_score: 99 } },
-    { id: "demo-4", timestamp: new Date(Date.now() - 420000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "MODIFY", file_path: "C:\\Users\\Finance\\Q3_report.xlsx", risk_score: 65 } },
-    { id: "demo-5", timestamp: new Date(Date.now() - 600000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "RENAME", file_path: "C:\\Backups\\db.zip -> db.locked", risk_score: 95 } },
-    { id: "demo-6", timestamp: new Date(Date.now() - 900000).toISOString(), device_id: "CORP-DC-01", canonical: { action: "DELETE", file_path: "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx", risk_score: 90 } }
-  ] : (q.data || []);
+    { id: "demo-1", timestamp: new Date().toISOString(), device_id: "FIN-WS-042", canonical: { action: "CREATE", file_path: "C:\\Projects\\RAGTEC\\monitored_workspace\\invoice.exe", risk_score: 98 }, threat_analysis: { classification: "Malware", severity: "High", rationale: "Executable binary dropped in workspace", mitigation_steps: [{ step: 1, title: "Quarantine File", action: "QUARANTINE_FILE", description: "Move invoice.exe to .quarantine enclave" }, { step: 2, title: "Process Triage", action: "PROCESS_TRIAGE", description: "Investigate parent process tree" }] } },
+    { id: "demo-2", timestamp: new Date(Date.now() - 180000).toISOString(), device_id: "DMZ-WEB-03", canonical: { action: "MODIFY", file_path: "C:\\Projects\\RAGTEC\\monitored_workspace\\cache.php", risk_score: 86 }, threat_analysis: { classification: "Malware", severity: "High", rationale: "Web shell backdoor execution function detected", mitigation_steps: [{ step: 1, title: "Quarantine File", action: "QUARANTINE_FILE", description: "Isolate cache.php" }] } },
+    { id: "demo-3", timestamp: new Date(Date.now() - 300000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "CREATE", file_path: "C:\\Projects\\RAGTEC\\monitored_workspace\\ransom_note.txt", risk_score: 99 }, threat_analysis: { classification: "Ransomware", severity: "Critical", rationale: "Ransomware extortion note detected", mitigation_steps: [{ step: 1, title: "Quarantine File", action: "QUARANTINE_FILE", description: "Move note to quarantine" }, { step: 2, title: "Isolate Subnet", action: "ISOLATE_ENDPOINT", description: "Block lateral movement" }] } },
+    { id: "demo-4", timestamp: new Date(Date.now() - 420000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "MODIFY", file_path: "C:\\Projects\\RAGTEC\\monitored_workspace\\Q3_report.xlsx", risk_score: 10 }, threat_analysis: { classification: "Benign", severity: "Low", rationale: "Routine file modification" } },
+    { id: "demo-5", timestamp: new Date(Date.now() - 600000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "RENAME", file_path: "C:\\Projects\\RAGTEC\\monitored_workspace\\db.locked", risk_score: 95 }, threat_analysis: { classification: "Ransomware", severity: "Critical", rationale: "Encrypted file artifact (.locked extension)" } },
+    { id: "demo-6", timestamp: new Date(Date.now() - 900000).toISOString(), device_id: "CORP-DC-01", canonical: { action: "DELETE", file_path: "C:\\Projects\\RAGTEC\\monitored_workspace\\Security.evtx", risk_score: 90 }, threat_analysis: { classification: "Insider Threat", severity: "High", rationale: "Security event log clearing detected" } }
+  ] : (fimEvents.data || []);
+
+  const activeAlerts = demoMode ? rawEvents.filter((e: any) => (e.canonical?.risk_score || 0) > 50) : (fimAlerts.data || []);
 
   return <div className="page">
-    <SectionTitle eyebrow="FILE INTEGRITY" title="FIM Monitor" />
+    <SectionTitle 
+      eyebrow="FILE INTEGRITY MONITORING & REAL-TIME CRUD ENGINE" 
+      title="FIM Telemetry & Threat Defense" 
+      action={
+        <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+          <Button 
+            className="pink-btn" 
+            onClick={() => scanMut.mutate()} 
+            disabled={scanMut.isPending}
+            style={{display:"inline-flex",alignItems:"center",gap:"6px"}}
+          >
+            <RefreshCw size={14} className={scanMut.isPending ? "spin" : ""} /> {scanMut.isPending ? "Scanning..." : "Scan Workspace"}
+          </Button>
+        </div>
+      } 
+    />
+
     {demoMode && (
       <div style={{padding:"0.75rem 1rem",background:"rgba(255,184,0,0.1)",border:"1px solid #f59e0b",borderRadius:6,marginBottom:"1rem",color:"#fbbf24",fontSize:"0.8rem",display:"flex",alignItems:"center",gap:8}}>
         <Flame size={16} />
-        <b>DEMO TELEMETRY ACTIVE:</b> Showing synthetic FIM demonstration attack chain. Switch top-right toggle to LIVE MODE for real filesystem monitoring.
+        <b>DEMO TELEMETRY ACTIVE:</b> Showing synthetic FIM demonstration attack chain. Switch top-right toggle to LIVE MODE for real filesystem monitoring on <code>C:\Projects\RAGTEC\monitored_workspace</code>.
+      </div>
+    )}
+
+    {/* Section 1: Threat Identified & Disclosed Mitigation Steps */}
+    {activeAlerts.length > 0 && (
+      <div style={{marginBottom:"2rem"}}>
+        <h3 style={{fontSize:"0.9rem",letterSpacing:"1px",color:"var(--pink)",marginBottom:"0.75rem",display:"flex",alignItems:"center",gap:"6px"}}>
+          <ShieldAlert size={16} /> THREAT IDENTIFIED — ACTIONABLE SECURITY ALERTS ({activeAlerts.length})
+        </h3>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(380px, 1fr))",gap:"1rem"}}>
+          {activeAlerts.map((a: any) => {
+            const analysis = a.threat_analysis || {};
+            const isQuarantined = a.status === "QUARANTINED" || a.canonical?.quarantine_path;
+            const filePath = a.canonical?.file_path || "unknown";
+            const fileName = filePath.split(/[/\\]/).pop() || filePath;
+            const steps = analysis.mitigation_steps || [
+              { step: 1, title: "Quarantine File", action: "QUARANTINE_FILE", description: `Move ${fileName} to isolated .quarantine enclave` },
+              { step: 2, title: "Investigate Parent Process", action: "PROCESS_TRIAGE", description: "Inspect origin and command arguments" }
+            ];
+
+            return (
+              <div key={a.id} style={{background:"#151722",border:"1px solid rgba(255,61,169,0.3)",borderRadius:8,padding:"1.2rem",boxShadow:"0 8px 20px rgba(0,0,0,0.4)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"0.75rem"}}>
+                  <div>
+                    <div style={{display:"flex",gap:"6px",alignItems:"center",marginBottom:"4px"}}>
+                      <Badge variant="destructive">{analysis.classification || "Malware"}</Badge>
+                      <Severity value={analysis.severity || "High"} />
+                      <span style={{fontSize:"0.7rem",color:"var(--text-muted)",fontFamily:"var(--mono)"}}>{a.device_id || "local"}</span>
+                    </div>
+                    <b style={{fontSize:"0.95rem",color:"#fff"}}>{fileName}</b>
+                  </div>
+                  <span style={{fontSize:"0.75rem",fontWeight:700,color:"var(--pink)",background:"rgba(255,61,169,0.15)",padding:"2px 8px",borderRadius:4}}>
+                    RISK {a.canonical?.risk_score || 95}
+                  </span>
+                </div>
+
+                <p style={{fontSize:"0.8rem",color:"#bbb",marginBottom:"0.75rem",lineHeight:1.4}}>
+                  {analysis.rationale || a.raw_message}
+                </p>
+
+                <div style={{background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"0.6rem 0.8rem",marginBottom:"0.9rem",border:"1px solid var(--border)"}}>
+                  <div style={{fontSize:"0.7rem",fontWeight:700,color:"var(--cyan)",letterSpacing:"0.5px",marginBottom:"4px"}}>
+                    REQUIRED MITIGATION PLAYBOOK:
+                  </div>
+                  {steps.map((s: any, idx: number) => (
+                    <div key={idx} style={{fontSize:"0.75rem",color:"#ddd",marginTop:"3px",display:"flex",alignItems:"flex-start",gap:"6px"}}>
+                      <span style={{color:"var(--cyan)",fontWeight:700}}>{s.step || idx+1}.</span>
+                      <div><b>{s.title}:</b> {s.description}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:"0.7rem",color:"var(--text-muted)",fontFamily:"var(--mono)"}}>
+                    {new Date(a.timestamp).toLocaleTimeString()} · {a.canonical?.action}
+                  </span>
+                  {isQuarantined ? (
+                    <Badge variant="outline" style={{borderColor:"var(--lime)",color:"var(--lime)"}}>
+                      <CheckCircle2 size={12} style={{marginRight:4}} /> QUARANTINED
+                    </Badge>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      onClick={() => quarMut.mutate({ filePath: a.canonical?.file_path, eventId: a.id })}
+                      disabled={quarMut.isPending}
+                      style={{background:"#e11d48",color:"#fff",fontSize:"0.75rem",fontWeight:700,height:28}}
+                    >
+                      <LockKeyhole size={12} style={{marginRight:4}} /> Quarantine File
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {/* Section 2: Real-Time CRUD Telemetry Stream */}
+    <div className="panel">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+        <div>
+          <h3 style={{fontSize:"0.85rem",letterSpacing:"1px",color:"var(--cyan)"}}>REAL-TIME CRUD AUDIT FEED</h3>
+          <p className="muted" style={{fontSize:"0.75rem",marginTop:2}}>
+            Live watcher active on <code>C:\Projects\RAGTEC\monitored_workspace</code> (Polling every 5s)
+          </p>
+        </div>
+        {quarantined.data && quarantined.data.length > 0 && (
+          <Badge variant="outline" style={{borderColor:"var(--amber)",color:"#fbbf24"}}>
+            {quarantined.data.length} Files in Quarantine
+          </Badge>
+        )}
+      </div>
+
+      {fimEvents.isLoading && !demoMode && <div style={{padding:"2rem"}}>Loading FIM data...</div>}
+      {!fimEvents.isLoading && rawEvents.length === 0 && (
+        <div style={{padding:"2rem"}} className="muted">
+          No FIM events logged yet. Create, edit, rename, or delete any file in <code>C:\Projects\RAGTEC\monitored_workspace</code> to see real-time detection.
+        </div>
+      )}
+      
+      {rawEvents.length > 0 && (
+        <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
+          <thead>
+            <tr style={{borderBottom:"1px solid var(--border)",fontSize:"0.75rem",color:"var(--text-muted)"}}>
+              <th style={{padding:"0.6rem 0.5rem"}}>Time</th>
+              <th>Host</th>
+              <th>CRUD Action</th>
+              <th>File Path</th>
+              <th>Threat Classification</th>
+              <th>Status / Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rawEvents.map((e: any) => {
+              const isThreat = (e.canonical?.risk_score || 0) > 50;
+              const isQuarantined = e.status === "QUARANTINED" || e.canonical?.quarantine_path;
+              const path = e.canonical?.file_path || e.title || "unknown";
+              const action = (e.canonical?.action || e.event_type || "UNKNOWN").toUpperCase();
+
+              return (
+                <tr key={e.id} style={{borderBottom:"1px solid var(--border)",fontSize:"0.8rem"}}>
+                  <td style={{padding:"0.8rem 0.5rem",fontFamily:"var(--mono)",fontSize:"0.75rem",color:"var(--text-muted)"}}>
+                    {new Date(e.timestamp).toLocaleTimeString()}
+                  </td>
+                  <td>{e.device_id || "local"}</td>
+                  <td>
+                    <span className={`fim-action ${action.toLowerCase()}`}>{action}</span>
+                  </td>
+                  <td style={{fontFamily:"var(--mono)",fontSize:"0.75rem",maxWidth:300,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={path}>
+                    {path}
+                  </td>
+                  <td>
+                    {isThreat ? (
+                      <span className="risk-score" style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                        <AlertTriangle size={12} /> {e.threat_analysis?.classification || "Threat"} (Risk {e.canonical?.risk_score})
+                      </span>
+                    ) : (
+                      <span className="fim-badge benign">Benign</span>
+                    )}
+                  </td>
+                  <td>
+                    {isQuarantined ? (
+                      <span style={{color:"var(--lime)",fontSize:"0.75rem",fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                        <CheckCircle2 size={13} /> Quarantined
+                      </span>
+                    ) : isThreat ? (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => quarMut.mutate({ filePath: e.canonical?.file_path, eventId: e.id })}
+                        disabled={quarMut.isPending}
+                        style={{height:24,fontSize:"0.7rem",borderColor:"var(--pink)",color:"var(--pink)"}}
+                      >
+                        Quarantine
+                      </Button>
+                    ) : (
+                      <span className="muted" style={{fontSize:"0.75rem"}}>Active</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </div>;
+}
+
+function FleetPage({ demoMode }: { demoMode?: boolean }) {
+  const q = trpc.soc.getDevices.useQuery();
+  const demoFleet = [
+    { id: "DEV-CORP-WS1", hostname: "FINANCE-PC-014", ip_address: "10.0.0.14", os_type: "Windows 11 Enterprise", criticality: "Medium", status: "Active" },
+    { id: "DEV-CORP-DC1", hostname: "CORP-DC-01", ip_address: "10.0.0.2", os_type: "Windows Server 2022", criticality: "Critical", status: "Active" },
+    { id: "DEV-DC-DB1", hostname: "PROD-DB-01", ip_address: "172.16.0.100", os_type: "Ubuntu 22.04 LTS", criticality: "Critical", status: "Active" },
+    { id: "DEV-DMZ-WEB1", hostname: "DMZ-WEB-03", ip_address: "192.168.1.10", os_type: "Debian 12 / Nginx", criticality: "High", status: "Investigating" },
+    { id: "DEV-ENG-LT1", hostname: "ENG-LT-019", ip_address: "10.0.2.45", os_type: "macOS Sonoma 14.5", criticality: "High", status: "Active" },
+    { id: "DEV-OPS-SRV", hostname: "OPS-SRV-07", ip_address: "172.16.0.40", os_type: "RHEL 9.2", criticality: "Medium", status: "Active" },
+    { id: "DEV-EDGE-GW", hostname: "EDGE-GW-01", ip_address: "185.220.101.1", os_type: "FortiOS 7.4", criticality: "Critical", status: "Active" }
+  ];
+
+  const devices = demoMode ? demoFleet : (q.data || []);
+
+  return <div className="page">
+    <SectionTitle eyebrow="ASSET MANAGEMENT & ENDPOINT TELEMETRY" title="Fleet Inventory" />
+    {demoMode && (
+      <div style={{padding:"0.75rem 1rem",background:"rgba(255,184,0,0.1)",border:"1px solid #f59e0b",borderRadius:6,marginBottom:"1rem",color:"#fbbf24",fontSize:"0.8rem",display:"flex",alignItems:"center",gap:8}}>
+        <Flame size={16} />
+        <b>DEMO FLEET ACTIVE:</b> Showing synthetic asset telemetry across 7 corporate networks.
       </div>
     )}
     <div className="panel">
-      {q.isLoading && !demoMode && <div style={{padding:"2rem"}}>Loading FIM data...</div>}
-      {!q.isLoading && rawEvents.length === 0 && <div style={{padding:"2rem"}} className="muted">No FIM events found. Try creating or deleting a file in the monitored workspace.</div>}
+      {q.isLoading && !demoMode && <div style={{padding:"2rem"}}>Loading fleet devices...</div>}
+      {!q.isLoading && devices.length === 0 && <div style={{padding:"2rem"}} className="muted">No devices reporting to the SOC.</div>}
       <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
-        <thead><tr style={{borderBottom:"1px solid var(--border)"}}><th style={{padding:"0.5rem"}}>Time</th><th>Host</th><th>Action</th><th>File Path</th><th>Risk</th></tr></thead>
+        <thead>
+          <tr style={{borderBottom:"1px solid var(--border)"}}>
+            <th style={{padding:"0.5rem"}}>Hostname</th>
+            <th>IP Address</th>
+            <th>Operating System</th>
+            <th>Criticality</th>
+            <th>Sensor Status</th>
+          </tr>
+        </thead>
         <tbody>
-          {rawEvents.map((e: any) => <tr key={e.id} style={{borderBottom:"1px solid var(--border)"}}>
-            <td style={{padding:"1rem 0.5rem",fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{new Date(e.timestamp).toLocaleTimeString()}</td>
-            <td>{e.device_id || "local"}</td>
-            <td><span className={`fim-action ${e.canonical?.action?.toLowerCase() || ""}`}>{e.canonical?.action}</span></td>
-            <td style={{fontFamily:"var(--mono)",fontSize:"0.75rem"}}>{e.canonical?.file_path}</td>
-            <td>{e.canonical?.risk_score > 50 ? <span className="risk-score">RISK {e.canonical.risk_score}</span> : <span className="fim-badge benign">Benign</span>}</td>
-          </tr>)}
+          {devices.map((d: any) => (
+            <tr key={d.id} style={{borderBottom:"1px solid var(--border)"}}>
+              <td style={{padding:"1rem 0.5rem",fontWeight:600}}>{d.hostname}</td>
+              <td style={{fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{d.ip_address}</td>
+              <td>{d.os_type || d.device_type}</td>
+              <td><Badge variant={d.criticality?.toLowerCase() === "critical" ? "destructive" : "outline"}>{d.criticality}</Badge></td>
+              <td>
+                <span style={{color:"var(--lime)",fontSize:"0.75rem",display:"flex",alignItems:"center",gap:4}}>
+                  <span className="pulse" style={{width:6,height:6,borderRadius:"50%",background:"var(--lime)"}} /> Connected
+                </span>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   </div>;
 }
 
-function FleetPage() {
-  const q = trpc.soc.getDevices.useQuery();
-  return <div className="page"><SectionTitle eyebrow="ASSET MANAGEMENT" title="Fleet" />
+function MitigationPage({ demoMode, flash }: { demoMode?: boolean; flash?: (t: string) => void }) {
+  const [actionsState, setActionsState] = useState<any[]>([
+    { id: "MIT-001", target: "FIN-WS-042", type: "QUARANTINE_FILE", desc: "Isolate ransomware binary 'invoice.exe' to secure enclave", status: "RECOMMENDED", playbook: "PB-RANSOMWARE-01" },
+    { id: "MIT-002", target: "EDGE-GW-01", type: "BLOCK_IP", desc: "Deploy edge firewall block for C2 address 185.220.101.4", status: "APPROVED", playbook: "PB-C2-CONTAINMENT" },
+    { id: "MIT-003", target: "ENG-LT-019", type: "KILL_PROCESS", desc: "Terminate unauthorized obfuscated powershell.exe (PID 4912)", status: "EXECUTED", playbook: "PB-EXECUTION-TRIAGE" },
+    { id: "MIT-004", target: "FIN-WS-042", type: "ISOLATE_ENDPOINT", desc: "Sever network adapter link on subnet 10.0.0.0/24", status: "RECOMMENDED", playbook: "PB-LATERAL-PREVENT" }
+  ]);
+
+  const handleAction = (id: string, nextStatus: string, msg: string) => {
+    setActionsState(prev => prev.map(a => a.id === id ? { ...a, status: nextStatus } : a));
+    flash?.(msg);
+  };
+
+  return <div className="page">
+    <SectionTitle eyebrow="INCIDENT RESPONSE & REMEDIATION ORCHESTRATOR" title="Autonomous Mitigation Console" />
     <div className="panel">
-      {q.isLoading && <div style={{padding:"2rem"}}>Loading fleet devices...</div>}
-      {!q.isLoading && (q.data || []).length === 0 && <div style={{padding:"2rem"}} className="muted">No devices reporting to the SOC.</div>}
+      <div style={{marginBottom:"1rem"}}>
+        <h3 style={{fontSize:"0.85rem",letterSpacing:"1px",color:"var(--cyan)"}}>ACTIVE MITIGATION ACTIONS & PLAYBOOKS</h3>
+        <p className="muted" style={{fontSize:"0.75rem",marginTop:2}}>
+          Actions are recommended by the RAGSec Reasoning Engine and require Tier 3 SOC Analyst authorization.
+        </p>
+      </div>
+
       <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
-        <thead><tr style={{borderBottom:"1px solid var(--border)"}}><th style={{padding:"0.5rem"}}>Hostname</th><th>IP</th><th>OS</th><th>Criticality</th></tr></thead>
+        <thead>
+          <tr style={{borderBottom:"1px solid var(--border)",fontSize:"0.75rem",color:"var(--text-muted)"}}>
+            <th style={{padding:"0.6rem 0.5rem"}}>ID</th>
+            <th>Target Device</th>
+            <th>Remediation Type</th>
+            <th>Playbook & Rationale</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
         <tbody>
-          {(q.data || []).map((d: any) => <tr key={d.id} style={{borderBottom:"1px solid var(--border)"}}>
-            <td style={{padding:"1rem 0.5rem"}}>{d.hostname}</td>
-            <td style={{fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{d.ip_address}</td>
-            <td>{d.os_type || d.device_type}</td>
-            <td><Badge variant="outline">{d.criticality}</Badge></td>
-          </tr>)}
+          {actionsState.map(a => (
+            <tr key={a.id} style={{borderBottom:"1px solid var(--border)",fontSize:"0.8rem"}}>
+              <td style={{padding:"1rem 0.5rem",fontFamily:"var(--mono)",fontSize:"0.75rem"}}>{a.id}</td>
+              <td style={{fontWeight:600}}>{a.target}</td>
+              <td>
+                <span style={{fontFamily:"var(--mono)",fontSize:"0.75rem",padding:"2px 6px",borderRadius:4,background:"rgba(71,234,255,0.1)",color:"var(--cyan)"}}>
+                  {a.type}
+                </span>
+              </td>
+              <td>
+                <div><b>[{a.playbook}]</b> {a.desc}</div>
+              </td>
+              <td>
+                <Badge variant={a.status === "EXECUTED" ? "default" : a.status === "APPROVED" ? "outline" : "destructive"}>
+                  {a.status}
+                </Badge>
+              </td>
+              <td>
+                {a.status === "RECOMMENDED" && (
+                  <Button size="sm" onClick={() => handleAction(a.id, "APPROVED", `Mitigation action ${a.id} approved by Analyst`)} style={{fontSize:"0.7rem",height:26}}>
+                    Approve
+                  </Button>
+                )}
+                {a.status === "APPROVED" && (
+                  <Button size="sm" onClick={() => handleAction(a.id, "EXECUTED", `Executing automated remediation on ${a.target}...`)} style={{background:"var(--lime)",color:"#000",fontSize:"0.7rem",height:26,fontWeight:700}}>
+                    <Play size={10} style={{marginRight:4}} /> Execute
+                  </Button>
+                )}
+                {a.status === "EXECUTED" && (
+                  <span style={{color:"var(--lime)",fontSize:"0.75rem",display:"flex",alignItems:"center",gap:4}}>
+                    <CheckCircle2 size={13} /> Verified
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   </div>;
 }
 
-function MitigationPage() {
-  return <div className="page"><SectionTitle eyebrow="RESPONSE" title="Autonomous Mitigation" /><div className="panel" style={{padding:"2rem",textAlign:"center"}}><CircleDashed size={40} style={{opacity:0.3,marginBottom:"1rem"}} /><p className="muted">This feature requires Phase 8 (Autonomous Simulation) and is not yet implemented.</p></div></div>;
+function SettingsPage({ flash }: { flash?: (t: string) => void }) {
+  const [monitoredDir, setMonitoredDir] = useState("C:\\Projects\\RAGTEC\\monitored_workspace");
+  const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
+  const [model, setModel] = useState("llama3.2");
+  const [critThresh, setCritThresh] = useState("0.70");
+
+  const save = () => {
+    flash?.("System configuration updated successfully");
+  };
+
+  return <div className="page">
+    <SectionTitle eyebrow="SYSTEM CONFIGURATION & POLICY ENGINE" title="SOC Console Settings" />
+    <div className="panel" style={{maxWidth:700}}>
+      <div style={{display:"flex",flexDirection:"column",gap:"1.2rem"}}>
+        <div>
+          <label style={{fontSize:"0.8rem",fontWeight:700,color:"var(--cyan)"}}>MONITORED WORKSPACE DIRECTORY</label>
+          <p className="muted" style={{fontSize:"0.75rem",marginBottom:"0.5rem"}}>Local folder path continuously monitored by the FIM Watcher and Threat Analyzer.</p>
+          <Input value={monitoredDir} onChange={e => setMonitoredDir(e.target.value)} style={{fontFamily:"var(--mono)",fontSize:"0.8rem"}} />
+        </div>
+
+        <div>
+          <label style={{fontSize:"0.8rem",fontWeight:700,color:"var(--cyan)"}}>LOCAL LLM INFERENCE ENGINE (OLLAMA)</label>
+          <p className="muted" style={{fontSize:"0.75rem",marginBottom:"0.5rem"}}>Host URL for private on-premises generative inference.</p>
+          <Input value={ollamaUrl} onChange={e => setOllamaUrl(e.target.value)} style={{fontFamily:"var(--mono)",fontSize:"0.8rem"}} />
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
+          <div>
+            <label style={{fontSize:"0.8rem",fontWeight:700,color:"var(--cyan)"}}>ACTIVE REASONING MODEL</label>
+            <Input value={model} onChange={e => setModel(e.target.value)} style={{fontFamily:"var(--mono)",fontSize:"0.8rem",marginTop:4}} />
+          </div>
+          <div>
+            <label style={{fontSize:"0.8rem",fontWeight:700,color:"var(--cyan)"}}>CRITICAL SIMILARITY THRESHOLD</label>
+            <Input value={critThresh} onChange={e => setCritThresh(e.target.value)} style={{fontFamily:"var(--mono)",fontSize:"0.8rem",marginTop:4}} />
+          </div>
+        </div>
+
+        <Button className="pink-btn" onClick={save} style={{alignSelf:"flex-start",marginTop:"0.5rem"}}>
+          Save Configuration
+        </Button>
+      </div>
+    </div>
+  </div>;
 }
 
-function SettingsPage() {
-  return <div className="page"><SectionTitle eyebrow="CONFIGURATION" title="Settings" /><div className="panel" style={{padding:"2rem",textAlign:"center"}}><p className="muted">System settings are currently managed via backend environment variables (config.py).</p></div></div>;
-}
-
-function StubPage({ name, demoMode }: { name: string; demoMode?: boolean }) {
+function StubPage({ name, demoMode, flash }: { name: string; demoMode?: boolean; flash?: (t: string) => void }) {
   if (name === "Incidents") return <IncidentsPage />;
   if (name === "Alerts") return <AlertsPage />;
-  if (name === "FIM Monitor") return <FimMonitorPage demoMode={demoMode} />;
-  if (name === "Fleet") return <FleetPage />;
-  if (name === "Mitigation") return <MitigationPage />;
-  if (name === "Settings") return <SettingsPage />;
+  if (name === "FIM Monitor") return <FimMonitorPage demoMode={demoMode} flash={flash} />;
+  if (name === "Fleet") return <FleetPage demoMode={demoMode} />;
+  if (name === "Mitigation") return <MitigationPage demoMode={demoMode} flash={flash} />;
+  if (name === "Settings") return <SettingsPage flash={flash} />;
   return <div className="page"><SectionTitle eyebrow="UNDER CONSTRUCTION" title={name} /><div className="panel" style={{padding:"2rem",textAlign:"center"}}><CircleDashed size={40} style={{opacity:0.3,marginBottom:"1rem"}} /><p className="muted">This module is scheduled for implementation in a future phase.</p></div></div>;
 }

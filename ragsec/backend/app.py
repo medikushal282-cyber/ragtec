@@ -15,9 +15,10 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize real filesystem FIM watcher on a test directory
-    workspace_dir = os.path.abspath(os.path.join(os.getcwd(), "..", "..", "test_monitor"))
+    # Initialize real filesystem FIM watcher on the monitored workspace directory
+    workspace_dir = os.environ.get("RAGSEC_MONITORED_DIR", os.path.abspath(os.path.join(os.getcwd(), "..", "..", "monitored_workspace")))
     os.makedirs(workspace_dir, exist_ok=True)
+    os.makedirs(os.path.join(workspace_dir, ".quarantine"), exist_ok=True)
     watcher = FIMWatcher(workspace_dir)
     watcher.start()
     yield

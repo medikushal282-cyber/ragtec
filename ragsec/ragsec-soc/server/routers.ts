@@ -66,6 +66,62 @@ export const appRouter = router({
       } catch (e) {}
       return [];
     }),
+    getFimAlerts: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/alerts");
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return [];
+    }),
+    quarantineFile: publicProcedure.input(z.object({ filePath: z.string().optional(), eventId: z.string().optional() })).mutation(async ({ input, ctx }) => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/quarantine", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          await appendAudit(ctx.user?.id || "ANALYST", "QUARANTINE_FILE", input.filePath || input.eventId || "unknown", data.status);
+          return data;
+        }
+        const err = await res.json();
+        return { status: "ERROR", detail: err.detail || "Quarantine failed" };
+      } catch (e: any) {
+        return { status: "ERROR", detail: e.message };
+      }
+    }),
+    restoreFile: publicProcedure.input(z.object({ quarantinePath: z.string(), originalPath: z.string() })).mutation(async ({ input, ctx }) => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          await appendAudit(ctx.user?.id || "ANALYST", "RESTORE_FILE", input.originalPath, data.status);
+          return data;
+        }
+        return { status: "ERROR" };
+      } catch (e: any) {
+        return { status: "ERROR", detail: e.message };
+      }
+    }),
+    listQuarantined: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/quarantined");
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return [];
+    }),
+    scanWorkspace: publicProcedure.mutation(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/scan", { method: "POST" });
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return { status: "ERROR" };
+    }),
     getDevices: publicProcedure.query(async () => {
       try {
         const res = await fetch("http://localhost:8000/api/soc/devices");

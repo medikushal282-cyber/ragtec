@@ -14,9 +14,10 @@ const severity = z.enum(["Critical", "High", "Medium", "Low"]);
 const status = z.enum(["New", "Investigating", "Resolved"]);
 const sourceMime = z.enum(["application/pdf", "text/plain"]);
 
-async function appendAudit(actorId: number | undefined, action: string, target: string, result: string) {
+async function appendAudit(actorId: number | string | undefined, action: string, target: string, result: string) {
   const db = await getDb(); if (!db) return;
-  await db.insert(auditEvents).values({ actorId, action, target, result, chainHash: `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}` });
+  const aid = typeof actorId === 'number' ? actorId : null;
+  await db.insert(auditEvents).values({ actorId: aid, action, target, result, chainHash: `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`, createdAt: new Date() });
 }
 export const RAG_THRESHOLDS = { Low: 0.65, Medium: 0.75, High: 0.85, Critical: 0.95 } as const;
 export function verifiedCitations(text: string, allowed: string[]) { return Array.from(text.matchAll(/\[([a-z0-9-]+)\]/gi)).map(m => m[1]).filter(id => allowed.includes(id)); }
@@ -31,7 +32,92 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({ me: publicProcedure.query(opts => opts.ctx.user), logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }) }),
   soc: router({
-    telemetrySnapshot: publicProcedure.query(() => ({ generatedAt: new Date(), simulated: true, alerts: [{ alertKey: "ALT-10482", title: "Ransomware encryption behavior", host: "FIN-WS-042", severity: "Critical", status: "Investigating" }, { alertKey: "ALT-10481", title: "PowerShell encoded command", host: "ENG-LT-019", severity: "High", status: "New" }, { alertKey: "ALT-10480", title: "Unsigned binary in system32", host: "DMZ-WEB-03", severity: "High", status: "Investigating" }], fim: [{ host: "FIN-WS-042", filePath: "C:\\Users\\Public\\invoice.exe", changeType: "Added", riskScore: 98, judgment: "Suspicious" }, { host: "DMZ-WEB-03", filePath: "/var/www/html/.cache.php", changeType: "Modified", riskScore: 86, judgment: "Suspicious" }], fleet: [{ hostname: "FIN-WS-042", os: "Windows 11 Enterprise", ip: "10.24.8.42", agentStatus: "Compromised" }, { hostname: "DMZ-WEB-03", os: "Ubuntu 24.04 LTS", ip: "10.24.3.19", agentStatus: "At risk" }, { hostname: "OPS-SRV-07", os: "Windows Server 2022", ip: "10.24.2.7", agentStatus: "Healthy" }], incidents: [{ incidentKey: "INC-2026-019", title: "Active encryption chain on Finance subnet", severity: "Critical", status: "Investigating" }, { incidentKey: "INC-2026-018", title: "Credential access indicators on engineering laptop", severity: "High", status: "Investigating" }], actions: [{ name: "Isolate compromised endpoint", risk: "HIGH IMPACT", status: "Approval required" }, { name: "Block malicious source IP", risk: "LOW RISK", status: "Dry-run ready" }] })),
+    systemHealth: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/search?q=healthcheck"); // Check if python is alive
+        if (res.ok) return { status: "online", msg: "ALL SYSTEMS NOMINAL" };
+        return { status: "degraded", msg: "API DEGRADED" };
+      } catch {
+        return { status: "offline", msg: "PYTHON API OFFLINE" };
+      }
+    }),
+    getEvents: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/soc/events");
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return [];
+    }),
+    getIncidents: publicProcedure.query(async () => {
+      // Fetch from dashboard for now, as it returns recent incidents
+      try {
+        const res = await fetch("http://localhost:8000/api/soc/dashboard");
+        if (res.ok) {
+          const data = await res.json();
+          return data.incidents || [];
+        }
+      } catch (e) {}
+      return [];
+    }),
+    getFimEvents: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/events");
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return [];
+    }),
+    getDevices: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/soc/devices");
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return [];
+    }),
+    telemetrySnapshot: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/soc/dashboard");
+        if (res.ok) {
+          const data = await res.json();
+          // transform incidents to match frontend expected format
+          const formattedIncidents = data.incidents?.map((i: any) => ({
+            id: i.id,
+            title: i.title,
+            severity: i.threat_classification?.severity || "Medium",
+            state: i.status || "Investigating",
+            time: i.timestamp ? new Date(i.timestamp).toLocaleTimeString() : "Now",
+            owner: "System",
+            techniques: []
+          })) || [];
+          
+          const formattedFim = data.fim?.map((e: any) => ({
+            time: new Date(e.timestamp).toLocaleTimeString(),
+            host: e.device_id || "local",
+            path: e.canonical?.file_path || "unknown",
+            action: e.canonical?.action || "unknown",
+            risk: e.canonical?.risk_score || 0,
+            hash: e.canonical?.file_hash || "unknown",
+            judgment: e.canonical?.risk_score > 50 ? "Suspicious" : "Benign"
+          })) || [];
+
+          return {
+            generatedAt: new Date(data.generatedAt),
+            simulated: false,
+            metrics: data.metrics || {
+              total_events: 0,
+              fim_events: 0,
+              total_incidents: 0,
+              device_count: 0,
+              critical_incidents: 0
+            },
+            incidents: formattedIncidents,
+            fim: formattedFim
+          };
+        }
+      } catch (e) {
+      }
+      // fallback
+      return { generatedAt: new Date(), simulated: true, alerts: [], fim: [], fleet: [], incidents: [], actions: [] };
+    }),
     listAlerts: protectedProcedure.input(z.object({ severity: severity.optional(), status: status.optional() }).optional()).query(async ({ input }) => { const db = await getDb(); if (!db) return []; const rows = await db.select().from(alerts).orderBy(desc(alerts.createdAt)); return rows.filter(r => (!input?.severity || r.severity === input.severity) && (!input?.status || r.status === input.status)); }),
     updateAlert: protectedProcedure.input(z.object({ id: z.number(), status, severity: severity.optional(), assignedTo: z.number().optional() })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; await db.update(alerts).set({ status: input.status, severity: input.severity, assignedTo: input.assignedTo }).where(eq(alerts.id, input.id)); await appendAudit(ctx.user.id, "UPDATE_ALERT", String(input.id), `${input.status}${input.severity ? `/${input.severity}` : ""}`); return { success: true }; }),
     ingestAlert: protectedProcedure.input(z.object({ alertKey: z.string(), title: z.string(), host: z.string(), severity, tactic: z.string().optional(), source: z.string().optional() })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; await db.insert(alerts).values(input); if (criticalNotificationRequired(input.severity)) { const delivered = await notifyOwner({ title: `Critical SOC alert: ${input.alertKey}`, content: `${input.title} on ${input.host}. Immediate analyst review required.` }); await db.insert(notificationEvents).values({ eventType: "CriticalAlert", targetKey: input.alertKey, delivered: delivered ? 1 : 0 }); } await appendAudit(ctx.user.id, "INGEST_ALERT", input.alertKey, input.severity); return { success: true }; }),
@@ -54,10 +140,124 @@ export const appRouter = router({
     listEvidence: protectedProcedure.input(z.object({ incidentId: z.number() })).query(async ({ input }) => { const db = await getDb(); return db ? db.select().from(evidenceAttachments).where(eq(evidenceAttachments.incidentId, input.incidentId)).orderBy(desc(evidenceAttachments.createdAt)) : []; }),
     attachEvidenceMetadata: protectedProcedure.input(z.object({ incidentId: z.number(), name: z.string(), mimeType: z.string(), storageKey: z.string(), sha256: z.string().optional() })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; await db.insert(evidenceAttachments).values({ ...input, uploadedBy: ctx.user.id }); await appendAudit(ctx.user.id, "ATTACH_EVIDENCE", String(input.incidentId), input.name); return { success: true }; }),
     escalateIncident: protectedProcedure.input(z.object({ incidentKey: z.string(), title: z.string() })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; await db.update(incidents).set({ escalatedAt: new Date(), status: "Investigating" }).where(eq(incidents.incidentKey, input.incidentKey)); const delivered = await notifyOwner({ title: `Incident escalated: ${input.incidentKey}`, content: input.title }); await db.insert(notificationEvents).values({ eventType: "IncidentEscalated", targetKey: input.incidentKey, delivered: delivered ? 1 : 0 }); await appendAudit(ctx.user.id, "ESCALATE_INCIDENT", input.incidentKey, "Notification dispatched"); return { success: true, notified: delivered }; }),
-    listFIM: protectedProcedure.query(async () => { const db = await getDb(); return db ? db.select().from(fimEvents).orderBy(desc(fimEvents.occurredAt)) : []; }),
+    listFIM: protectedProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/events");
+        if (res.ok) {
+          const events = await res.json();
+          return events.map((e: any) => ({
+            id: e.id,
+            host: e.device_id || "local",
+            filePath: e.canonical?.file_path || "unknown",
+            changeType: e.canonical?.action || "unknown",
+            sha256: e.canonical?.file_hash_sha256 || "",
+            riskScore: e.is_suspicious ? 95 : 10,
+            judgment: e.is_suspicious ? "Suspicious" : "Benign",
+            occurredAt: new Date(e.timestamp)
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch FIM events:", e);
+      }
+      return [];
+    }),
     listFleet: protectedProcedure.query(async () => { const db = await getDb(); return db ? db.select().from(fleetHosts).orderBy(desc(fleetHosts.lastSeenAt)) : []; }),
-    listSources: protectedProcedure.query(async () => { const db = await getDb(); return db ? db.select().from(knowledgeSources).orderBy(desc(knowledgeSources.createdAt)) : []; }),
-    uploadKnowledgeSource: protectedProcedure.input(z.object({ name: z.string().min(1), mimeType: sourceMime, base64: z.string().min(1) })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; const raw = Buffer.from(input.base64, "base64"); if (!validKnowledgeUpload(input.mimeType, raw.byteLength)) throw new Error("Only non-empty PDF/TXT files up to 50 MB are accepted"); const stored = await storagePut(`knowledge/${ctx.user.id}/${Date.now()}-${input.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`, raw, input.mimeType); await db.insert(knowledgeSources).values({ name: input.name, mimeType: input.mimeType, storageKey: stored.key, uploadedBy: ctx.user.id, ingestionStatus: "Queued" }); await appendAudit(ctx.user.id, "UPLOAD_KNOWLEDGE_SOURCE", input.name, "Queued for ingestion"); return { success: true, key: stored.key }; }),
+    listSources: protectedProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/knowledge/sources");
+        if (res.ok) {
+          const sources = await res.json();
+          return sources.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            mimeType: s.mimeType,
+            storageKey: s.id,
+            ingestionStatus: s.ingestionStatus,
+            chunkCount: s.chunkCount,
+            uploadedBy: 1, // Default or admin
+            createdAt: new Date(s.createdAt),
+            extractedEntities: s.extractedEntities // Expose entities to frontend
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch knowledge sources:", e);
+      }
+      return [];
+    }),
+    uploadKnowledgeSource: protectedProcedure.input(z.object({ name: z.string().min(1), mimeType: z.string(), base64: z.string().min(1) })).mutation(async ({ input, ctx }) => {
+      const raw = Buffer.from(input.base64, "base64"); 
+      const content = raw.toString('utf-8'); // Assume text-based for now (txt, csv, json, yml)
+      
+      const payload = {
+          title: input.name,
+          content: content,
+          source_name: input.name,
+          source_type: "cti_report"
+      };
+
+      try {
+        const res = await fetch("http://localhost:8000/api/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error("Python ingest failed");
+        const data = await res.json();
+        await appendAudit(ctx.user.id, "UPLOAD_KNOWLEDGE_SOURCE", input.name, `Ingested ${data.chunks_extracted} chunks`);
+        return { success: true, key: data.document_id };
+      } catch (e) {
+        console.error(e);
+        return { success: false };
+      }
+    }),
+    retrievePhase3: protectedProcedure.input(z.object({ query: z.string() })).mutation(async ({ input }) => {
+      try {
+        const res = await fetch("http://localhost:8000/api/retrieve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: input.query, top_k: 50, top_n: 5 })
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (e) {
+        console.error("Retrieve Phase 3 error", e);
+      }
+      return { query: input.query, evidence: [] };
+    }),
+    queryPhase7: publicProcedure.input(z.object({ query: z.string() })).mutation(async ({ input, ctx }) => {
+      try {
+        const res = await fetch("http://localhost:8000/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: input.query })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const status = data.status || "ANSWERED";
+          await appendAudit(ctx.user?.id || "anonymous", status === "ABSTAINED" ? "RAG_QUERY_ABSTAIN" : "RAG_QUERY", input.query.slice(0, 180), status === "ABSTAINED" ? "Evidence insufficient" : "Evidence-grounded response");
+          
+          // Force UI to show actual Identity Verified state
+          if (data.governance) {
+            data.governance.identity_verified = !!ctx.user?.id;
+          }
+          
+          return data;
+        }
+      } catch (e) {
+        console.error("Query Phase 7 error", e);
+      }
+      return { answer: "AI Chat Error: Could not connect to backend.", evidence: [], governance: { gating: "ERROR", pii_masked: false, cross_encoder_active: false, citation_check: "ERROR", crc_passed: false, identity_verified: false } };
+    }),
+    globalSearch: publicProcedure.input(z.object({ q: z.string() })).query(async ({ input }) => {
+      try {
+        const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(input.q)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.error("Global search error", e);
+      }
+      return { results: [], query: input.q, count: 0 };
+    }),
     listPlaybooks: protectedProcedure.query(async () => { const db = await getDb(); return db ? db.select().from(playbooks).orderBy(desc(playbooks.createdAt)) : []; }),
     requestMitigation: protectedProcedure.input(z.object({ playbookId: z.number(), incidentId: z.number().optional() })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; await db.insert(mitigationActions).values({ playbookId: input.playbookId, incidentId: input.incidentId, requestedBy: ctx.user.id }); await appendAudit(ctx.user.id, "REQUEST_MITIGATION", String(input.playbookId), "Approval requested"); return { success: true, requiresApproval: true }; }),
     approveMitigation: adminProcedure.input(z.object({ actionId: z.number() })).mutation(async ({ input, ctx }) => { const db = await getDb(); if (!db) return { success: false }; await db.update(mitigationActions).set({ status: "Approved" }).where(eq(mitigationActions.id, input.actionId)); await appendAudit(ctx.user.id, "APPROVE_MITIGATION", String(input.actionId), "Approved by admin"); return { success: true }; }),

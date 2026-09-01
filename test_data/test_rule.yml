@@ -1,0 +1,15 @@
+title: Suspicious PowerShell Download
+id: 5f113a8f-8b61-41ca-b90f-d374542a2223
+status: test
+description: Detects suspicious PowerShell download cradle
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\powershell.exe'
+        CommandLine|contains: 'Net.WebClient'
+    condition: selection
+tags:
+    - attack.execution
+    - attack.t1059.001

@@ -9,6 +9,7 @@ Cybersecurity-aware chunking preserving full document provenance:
 import re
 import csv
 import io
+import json
 from typing import List
 from models import CanonicalDocument, CanonicalChunk
 from ingestion.entities import extract_entities_from_text
@@ -31,33 +32,22 @@ def chunk_narrative(doc: CanonicalDocument, max_chunk_chars: int = 600, overlap_
                     chunk_text = buffer.strip()
                     c_id = f"{doc.document_id}-CHK-{chunk_idx:03d}"
                     chunks.append(CanonicalChunk(
-                        chunk_id=c_id,
-                        document_id=doc.document_id,
-                        source_name=doc.source_name,
-                        source_type=doc.source_type,
-                        chunk_index=chunk_idx,
-                        text=chunk_text,
-                        sensitivity_tier=doc.sensitivity_tier,
-                        publication_timestamp=doc.publication_timestamp,
+                        chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+                        source_type=doc.source_type, chunk_index=chunk_idx, text=chunk_text,
+                        sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
                         extracted_entities=extract_entities_from_text(chunk_text)
                     ))
                     chunk_idx += 1
                     buffer = (buffer[-overlap_chars:] + " " + s).strip()
                 else:
                     buffer = (buffer + " " + s).strip()
-                    
             if buffer.strip():
                 chunk_text = buffer.strip()
                 c_id = f"{doc.document_id}-CHK-{chunk_idx:03d}"
                 chunks.append(CanonicalChunk(
-                    chunk_id=c_id,
-                    document_id=doc.document_id,
-                    source_name=doc.source_name,
-                    source_type=doc.source_type,
-                    chunk_index=chunk_idx,
-                    text=chunk_text,
-                    sensitivity_tier=doc.sensitivity_tier,
-                    publication_timestamp=doc.publication_timestamp,
+                    chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+                    source_type=doc.source_type, chunk_index=chunk_idx, text=chunk_text,
+                    sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
                     extracted_entities=extract_entities_from_text(chunk_text)
                 ))
                 chunk_idx += 1
@@ -65,23 +55,16 @@ def chunk_narrative(doc: CanonicalDocument, max_chunk_chars: int = 600, overlap_
             chunk_text = para.strip()
             c_id = f"{doc.document_id}-CHK-{chunk_idx:03d}"
             chunks.append(CanonicalChunk(
-                chunk_id=c_id,
-                document_id=doc.document_id,
-                source_name=doc.source_name,
-                source_type=doc.source_type,
-                chunk_index=chunk_idx,
-                text=chunk_text,
-                sensitivity_tier=doc.sensitivity_tier,
-                publication_timestamp=doc.publication_timestamp,
+                chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+                source_type=doc.source_type, chunk_index=chunk_idx, text=chunk_text,
+                sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
                 extracted_entities=extract_entities_from_text(chunk_text)
             ))
             chunk_idx += 1
-            
     return chunks
 
 def chunk_rule_block(doc: CanonicalDocument) -> List[CanonicalChunk]:
     """Atomic rule-block chunking for YARA/Sigma."""
-    # Split by 'rule ' or 'title:' which usually denote start of a new block in YARA or Sigma
     blocks = re.split(r'\n(?=rule\s+[a-zA-Z0-9_]+\s*\{|\s*title:\s*)', doc.content)
     chunks = []
     chunk_idx = 0
@@ -90,14 +73,9 @@ def chunk_rule_block(doc: CanonicalDocument) -> List[CanonicalChunk]:
         chunk_text = block.strip()
         c_id = f"{doc.document_id}-CHK-{chunk_idx:03d}"
         chunks.append(CanonicalChunk(
-            chunk_id=c_id,
-            document_id=doc.document_id,
-            source_name=doc.source_name,
-            source_type=doc.source_type,
-            chunk_index=chunk_idx,
-            text=chunk_text,
-            sensitivity_tier=doc.sensitivity_tier,
-            publication_timestamp=doc.publication_timestamp,
+            chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+            source_type=doc.source_type, chunk_index=chunk_idx, text=chunk_text,
+            sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
             extracted_entities=extract_entities_from_text(chunk_text)
         ))
         chunk_idx += 1
@@ -116,14 +94,9 @@ def chunk_ioc_csv(doc: CanonicalDocument, rows_per_chunk: int = 5) -> List[Canon
                 chunk_text = "\n".join(buffer)
                 c_id = f"{doc.document_id}-CHK-{chunk_idx:03d}"
                 chunks.append(CanonicalChunk(
-                    chunk_id=c_id,
-                    document_id=doc.document_id,
-                    source_name=doc.source_name,
-                    source_type=doc.source_type,
-                    chunk_index=chunk_idx,
-                    text=chunk_text,
-                    sensitivity_tier=doc.sensitivity_tier,
-                    publication_timestamp=doc.publication_timestamp,
+                    chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+                    source_type=doc.source_type, chunk_index=chunk_idx, text=chunk_text,
+                    sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
                     extracted_entities=extract_entities_from_text(chunk_text)
                 ))
                 chunk_idx += 1
@@ -132,30 +105,40 @@ def chunk_ioc_csv(doc: CanonicalDocument, rows_per_chunk: int = 5) -> List[Canon
             chunk_text = "\n".join(buffer)
             c_id = f"{doc.document_id}-CHK-{chunk_idx:03d}"
             chunks.append(CanonicalChunk(
-                chunk_id=c_id,
-                document_id=doc.document_id,
-                source_name=doc.source_name,
-                source_type=doc.source_type,
-                chunk_index=chunk_idx,
-                text=chunk_text,
-                sensitivity_tier=doc.sensitivity_tier,
-                publication_timestamp=doc.publication_timestamp,
+                chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+                source_type=doc.source_type, chunk_index=chunk_idx, text=chunk_text,
+                sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
                 extracted_entities=extract_entities_from_text(chunk_text)
             ))
-        
-        if not chunks:
-            # Nothing parsed properly as CSV rows, fallback
-            return chunk_narrative(doc)
     except Exception:
-        # Fallback to narrative if parsing fails
+        return chunk_narrative(doc)
+    return chunks
+
+def chunk_json(doc: CanonicalDocument) -> List[CanonicalChunk]:
+    chunks = []
+    try:
+        data = json.loads(doc.content)
+        if isinstance(data, list):
+            for idx, item in enumerate(data):
+                text = json.dumps(item)
+                c_id = f"{doc.document_id}-CHK-{idx:03d}"
+                chunks.append(CanonicalChunk(
+                    chunk_id=c_id, document_id=doc.document_id, source_name=doc.source_name,
+                    source_type=doc.source_type, chunk_index=idx, text=text,
+                    sensitivity_tier=doc.sensitivity_tier, publication_timestamp=doc.publication_timestamp,
+                    extracted_entities=extract_entities_from_text(text)
+                ))
+    except Exception:
         return chunk_narrative(doc)
     return chunks
 
 def chunk_document(doc: CanonicalDocument) -> List[CanonicalChunk]:
     """Format-aware parsing/chunking orchestrator."""
-    if doc.source_type == "rule":
-        return chunk_rule_block(doc)
-    elif doc.source_type == "csv":
+    if doc.source_name.endswith('.csv') or doc.source_type == 'csv':
         return chunk_ioc_csv(doc)
+    elif doc.source_name.endswith('.json') or doc.source_type == 'json':
+        return chunk_json(doc)
+    elif doc.source_name.endswith('.yml') or doc.source_name.endswith('.yar') or doc.source_type == 'rule':
+        return chunk_rule_block(doc)
     else:
         return chunk_narrative(doc)

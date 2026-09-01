@@ -1,0 +1,4 @@
+indicator,type,description,confidence
+10.0.0.99,ipv4,Internal compromised host,high
+malicious-domain.com,domain,Known C2 domain,high
+aaabbbcccdddeeefff111222333444555666777888,sha1,Ransomware binary,medium

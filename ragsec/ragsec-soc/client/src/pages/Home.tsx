@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Streamdown } from "streamdown";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
-  Activity, AlertTriangle, ArrowUpRight, Bot, CheckCircle2, ChevronRight, CircleDot,
+  Activity, AlertTriangle, ArrowUpRight, Bot, CheckCircle2, ChevronRight, CircleDashed, CircleDot,
   ClipboardCheck, CloudUpload, Database, FileKey2, FileWarning, Filter, Flame, Globe2,
   Hash, LayoutDashboard, LockKeyhole, Menu, MessageSquareText, Network, Play, Plus,
   Radar, RefreshCw, Search, Send, Server, Settings2, ShieldAlert, ShieldCheck, Siren,
-  SlidersHorizontal, Sparkles, Terminal, UserRound, Users, X, Zap
+  SlidersHorizontal, Sparkles, Terminal, UserRound, Users, X, XCircle, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +24,11 @@ const nav = [
 ] as const;
 
 const alerts = [
-  { id: "ALT-10482", title: "Ransomware encryption behavior", host: "FIN-WS-042", severity: "Critical", status: "Investigating", age: "4m", tactic: "Impact", hash: "a9f2…c31e" },
-  { id: "ALT-10481", title: "PowerShell encoded command", host: "ENG-LT-019", severity: "High", status: "New", age: "11m", tactic: "Execution", hash: "b41c…99d2" },
-  { id: "ALT-10480", title: "Unsigned binary in system32", host: "DMZ-WEB-03", severity: "High", status: "Investigating", age: "18m", tactic: "Defense Evasion", hash: "7d0a…4f18" },
-  { id: "ALT-10479", title: "Repeated failed lateral movement", host: "OPS-SRV-07", severity: "Medium", status: "New", age: "29m", tactic: "Lateral Movement", hash: "—" },
-  { id: "ALT-10477", title: "External scan against VPN", host: "EDGE-GW-01", severity: "Low", status: "Resolved", age: "42m", tactic: "Reconnaissance", hash: "—" },
+  { id: "ALT-10482", title: "Ransomware encryption behavior", host: "FIN-WS-042", severity: "Critical", status: "Investigating", age: "4m", tactic: "Impact", hash: "a9f2â€¦c31e" },
+  { id: "ALT-10481", title: "PowerShell encoded command", host: "ENG-LT-019", severity: "High", status: "New", age: "11m", tactic: "Execution", hash: "b41câ€¦99d2" },
+  { id: "ALT-10480", title: "Unsigned binary in system32", host: "DMZ-WEB-03", severity: "High", status: "Investigating", age: "18m", tactic: "Defense Evasion", hash: "7d0aâ€¦4f18" },
+  { id: "ALT-10479", title: "Repeated failed lateral movement", host: "OPS-SRV-07", severity: "Medium", status: "New", age: "29m", tactic: "Lateral Movement", hash: "â€”" },
+  { id: "ALT-10477", title: "External scan against VPN", host: "EDGE-GW-01", severity: "Low", status: "Resolved", age: "42m", tactic: "Reconnaissance", hash: "â€”" },
 ];
 const incidents = [
   { id: "INC-2026-019", title: "Active encryption chain on Finance subnet", severity: "Critical", state: "Escalated", time: "09:42", owner: "M. Chen", techniques: ["T1486", "T1059.001"] },
@@ -35,22 +36,22 @@ const incidents = [
   { id: "INC-2026-017", title: "Internet-facing web shell candidate", severity: "Medium", state: "Contained", time: "Yesterday", owner: "J. Patel", techniques: ["T1505.003"] },
 ];
 const fim = [
-  { time: "09:48:14", host: "FIN-WS-042", path: "C:\\Users\\Public\\invoice.exe", action: "Added", risk: 98, hash: "a9f2c3…c31e", judgment: "Suspicious" },
-  { time: "09:45:02", host: "DMZ-WEB-03", path: "/var/www/html/.cache.php", action: "Modified", risk: 86, hash: "7d0a44…4f18", judgment: "Suspicious" },
-  { time: "09:39:41", host: "ENG-LT-019", path: "C:\\Windows\\Temp\\ps_1.tmp", action: "Added", risk: 74, hash: "b41c11…99d2", judgment: "Suspicious" },
-  { time: "09:31:19", host: "OPS-SRV-07", path: "/etc/ssh/sshd_config", action: "Modified", risk: 38, hash: "d0ee55…1a2c", judgment: "Benign" },
+  { time: "09:48:14", host: "FIN-WS-042", path: "C:\\Users\\Public\\invoice.exe", action: "Added", risk: 98, hash: "a9f2c3â€¦c31e", judgment: "Suspicious" },
+  { time: "09:45:02", host: "DMZ-WEB-03", path: "/var/www/html/.cache.php", action: "Modified", risk: 86, hash: "7d0a44â€¦4f18", judgment: "Suspicious" },
+  { time: "09:39:41", host: "ENG-LT-019", path: "C:\\Windows\\Temp\\ps_1.tmp", action: "Added", risk: 74, hash: "b41c11â€¦99d2", judgment: "Suspicious" },
+  { time: "09:31:19", host: "OPS-SRV-07", path: "/etc/ssh/sshd_config", action: "Modified", risk: 38, hash: "d0ee55â€¦1a2c", judgment: "Benign" },
 ];
 const logs = [
   "09:48:14.221  IDS/IPS  signature=ET RANSOMWARE Possible BlackSuit encryption  src=10.24.8.42 dst=10.24.1.19 action=ALERT",
-  "09:47:56.012  FIM      host=FIN-WS-042 event=CREATE path=C:\\Users\\Public\\invoice.exe sha256=a9f2c3…c31e",
+  "09:47:56.012  FIM      host=FIN-WS-042 event=CREATE path=C:\\Users\\Public\\invoice.exe sha256=a9f2c3â€¦c31e",
   "09:47:02.843  SIGMA    rule=Suspicious PowerShell Encoded Command host=ENG-LT-019 user=<INTERNAL_USER_1>",
   "09:46:38.521  NETFLOW  src=10.24.8.42 dst=10.24.1.19 ports=445,3389 bytes=18840 verdict=ANOMALOUS",
-  "09:45:02.449  FIM      host=DMZ-WEB-03 event=MODIFY path=/var/www/html/.cache.php sha256=7d0a44…4f18",
+  "09:45:02.449  FIM      host=DMZ-WEB-03 event=MODIFY path=/var/www/html/.cache.php sha256=7d0a44â€¦4f18",
   "09:44:15.108  IDS/IPS  signature=ET SCAN Potential SSH Scan src=185.220.101.4 dst=10.24.0.0/16 action=DROP",
 ];
 
 function Severity({ value }: { value: string }) { const cls = value === "Critical" ? "critical" : value === "High" ? "high" : value === "Medium" ? "medium" : "low"; return <span className={`severity ${cls}`}><span className="dot" />{value}</span>; }
-function Status({ value }: { value: string }) { return <span className={`status status-${value.toLowerCase()}`}><span className="dot" />{value}</span>; }
+function Status({ value }: { value: string }) { return <span className={`status status-${(value || "open").toLowerCase()}`}><span className="dot" />{value}</span>; }
 function SectionTitle({ eyebrow, title, action }: { eyebrow: string; title: string; action?: React.ReactNode }) { return <div className="section-head"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div>{action}</div>; }
 function MiniStat({ label, value, tone, sub }: { label: string; value: string; tone: string; sub: string }) { return <div className="mini-stat"><div className={`stat-icon ${tone}`}><Activity size={17} /></div><div><div className="stat-label">{label}</div><strong>{value}</strong><span>{sub}</span></div></div>; }
 
@@ -58,47 +59,400 @@ export default function Home() {
   const { user, isAuthenticated, loading } = useAuth();
   const [active, setActive] = useState("Dashboard");
   const [query, setQuery] = useState("");
-  const [sentQuery, setSentQuery] = useState("How does the ransomware signal on FIN-WS-042 map to known ATT&CK techniques?");
+  const [sentQuery, setSentQuery] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
-  const [live, setLive] = useState(true);
-  const [selectedAlert, setSelectedAlert] = useState(alerts[0]);
+  const [demoMode, setDemoMode] = useState(false);
   const [notice, setNotice] = useState("");
-
-  const answer = useMemo(() => `Submit a query to retrieve evidence-grounded analysis from the private knowledge base.`, [sentQuery]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const searchResults = trpc.soc.globalSearch.useQuery({ q: searchQuery }, { enabled: searchQuery.length >= 2 });
+  const health = trpc.soc.systemHealth.useQuery(undefined, { refetchInterval: 10000 });
 
   const flash = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(""), 2600); };
-  const page = active === "Dashboard" ? <Dashboard onNavigate={setActive} /> : active === "Threat Query" ? <ThreatQuery query={query} setQuery={setQuery} sentQuery={sentQuery} setSentQuery={setSentQuery} answer={answer} /> : active === "Alerts" ? <Alerts onSelect={setSelectedAlert} selected={selectedAlert} flash={flash} /> : active === "Incidents" ? <Incidents flash={flash} /> : active === "FIM Monitor" ? <FIM /> : active === "Fleet" ? <Fleet /> : active === "Mitigation" ? <Mitigation flash={flash} /> : active === "Knowledge Base" ? <Knowledge flash={flash} /> : active === "Audit Log" ? <Audit /> : <Settings />;
+  const page = active === "Dashboard" ? <Dashboard onNavigate={setActive} demoMode={demoMode} /> : active === "Threat Query" ? <ThreatQuery query={query} setQuery={setQuery} sentQuery={sentQuery} setSentQuery={setSentQuery} /> : active === "Knowledge Base" ? <Knowledge flash={flash} /> : active === "Audit Log" ? <Audit /> : <StubPage name={active} demoMode={demoMode} />;
 
+  const isNominal = health.data?.status === "online";
+  const healthLabel = health.data?.msg || "CHECKING...";
+  
   if (loading) return <div className="splash"><Radar size={34} /><span>INITIALIZING SECURE CONSOLE</span></div>;
   return <div className="app-shell">
     {notice && <div className="toast"><CheckCircle2 size={17} /> {notice}</div>}
     <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
       <div className="brand"><div className="brand-mark"><Radar size={21} /></div><div><b>RAGSEC</b><span>SOC / COMMAND</span></div><button className="mobile-close" onClick={() => setMobileNav(false)}><X size={18} /></button></div>
       <div className="side-label">OPERATIONS</div>
-      <nav>{nav.slice(0, 7).map(([label, Icon]) => <button key={label} className={active === label ? "nav-active" : ""} onClick={() => { setActive(label); setMobileNav(false); }}><Icon size={17} /><span>{label}</span>{["Alerts", "Incidents"].includes(label) && <em>{label === "Alerts" ? "12" : "3"}</em>}</button>)}</nav>
+      <nav>{nav.slice(0, 7).map(([label, Icon]) => <button key={label} className={active === label ? "nav-active" : ""} onClick={() => { setActive(label); setMobileNav(false); }}><Icon size={17} /><span>{label}</span></button>)}</nav>
       <div className="side-label">GOVERNANCE</div>
       <nav>{nav.slice(7).map(([label, Icon]) => <button key={label} className={active === label ? "nav-active" : ""} onClick={() => { setActive(label); setMobileNav(false); }}><Icon size={17} /><span>{label}</span></button>)}</nav>
-      <div className="side-bottom"><div className="system-card"><div className="online"><span className="pulse" /> SYSTEM NOMINAL</div><small>All collectors reporting</small><div className="system-bar"><span /></div></div><div className="profile"><div className="avatar">{user?.name?.slice(0, 1) || "A"}</div><div><b>{user?.name || "Analyst One"}</b><span>Tier 3 · SOC Analyst</span></div><ChevronRight size={15} /></div></div>
+      <div className="side-bottom"><div className="system-card"><div className={isNominal ? "online" : "offline"}><span className={isNominal ? "pulse" : ""} /> {healthLabel}</div><small>Core services</small><div className="system-bar"><span style={{background: isNominal ? "var(--lime)" : "var(--pink)"}} /></div></div><div className="profile"><div className="avatar">{user?.name?.slice(0, 1) || "A"}</div><div><b>{user?.name || "Analyst One"}</b><span>Tier 3 · SOC Analyst</span></div><ChevronRight size={15} /></div></div>
     </aside>
     <main className="main-area">
-      <header className="topbar"><button className="menu-button" onClick={() => setMobileNav(true)}><Menu size={20} /></button><div className="crumb"><span>SECURITY OPERATIONS</span><ChevronRight size={14} /><b>{active.toUpperCase()}</b></div><div className="top-actions"><div className="global-search"><Search size={15} /><input placeholder="Search IOC, host, CVE…" /></div><div className="status-pill"><span className="pulse" /> ALL SYSTEMS NOMINAL</div><button className="icon-button" onClick={() => flash("No new notifications") }><BellIcon /></button>{isAuthenticated ? <div className="top-avatar">{user?.name?.slice(0, 1) || "A"}</div> : <Button onClick={() => startLogin()} className="login-btn">Sign in</Button>}</div></header>
+      <header className="topbar"><button className="menu-button" onClick={() => setMobileNav(true)}><Menu size={20} /></button><div className="crumb"><span>SECURITY OPERATIONS</span><ChevronRight size={14} /><b>{active.toUpperCase()}</b></div><div className="top-actions"><div className="global-search" style={{position:"relative"}}><Search size={15} /><input placeholder="Search IOC, host, CVE…" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setShowSearch(true); }} onFocus={() => setShowSearch(true)} onBlur={() => setTimeout(() => setShowSearch(false), 200)} />{showSearch && searchQuery.length >= 2 && <div style={{position:"absolute",top:"100%",left:0,width:350,background:"#11131a",border:"1px solid var(--border)",borderRadius:6,maxHeight:300,overflowY:"auto",zIndex:999,padding:"0.5rem",boxShadow:"0 10px 25px rgba(0,0,0,0.5)"}}>{searchResults.isLoading && <div className="muted" style={{padding:"0.5rem"}}>Searching...</div>}{!searchResults.isLoading && (searchResults.data?.results || []).length === 0 && <div className="muted" style={{padding:"0.5rem"}}>No results for "{searchQuery}"</div>}{(searchResults.data?.results || []).map((r: any, i: number) => (
+          <div key={i} style={{padding:"0.4rem 0.5rem",borderBottom:"1px solid var(--border)",fontSize:"0.8rem",cursor:"pointer"}} onClick={() => { 
+            if(r.type === "entity") { setQuery(r.value); setActive("Threat Query"); } 
+            setShowSearch(false); 
+          }}>
+            <span style={{fontSize:"0.65rem",padding:"1px 6px",borderRadius:3,background:"var(--cyan)",color:"#000",marginRight:6}}>{r.type.toUpperCase()}</span>
+            {r.type === "entity" ? `${r.entity_type}: ${r.value}` : r.type === "document" ? r.name : (r.text || r.snippet)?.slice(0,80)}
+            {r.score && <span style={{color:"var(--green)",marginLeft:6,fontSize:"0.7rem"}}>({r.score})</span>}
+          </div>
+        ))}</div>}</div><div className="status-pill" style={{borderColor: isNominal ? "var(--lime)" : "var(--pink)", color: isNominal ? "var(--lime)" : "var(--pink)"}}><span className={isNominal ? "pulse" : ""} style={{background: isNominal ? "var(--lime)" : "var(--pink)"}} /> {healthLabel}</div><button className="icon-button" onClick={() => flash("No new notifications") }><BellIcon /></button><button className={`demo-toggle-btn ${demoMode ? "demo-active" : ""}`} onClick={() => { const next = !demoMode; setDemoMode(next); flash(next ? "DEMO TELEMETRY ACTIVE (Synthetic Dataset)" : "LIVE TELEMETRY ACTIVE (Real Filesystem)"); }} style={{display:"inline-flex",alignItems:"center",gap:"6px",background:demoMode ? "rgba(255, 184, 0, 0.18)" : "rgba(255, 255, 255, 0.05)",border:`1px solid ${demoMode ? "#f59e0b" : "var(--border)"}`,color:demoMode ? "#fbbf24" : "var(--text-muted)",padding:"4px 10px",borderRadius:"16px",fontSize:"0.75rem",fontWeight:600,cursor:"pointer",letterSpacing:"0.5px"}} title="Toggle Demo Mode"><span style={{width:7,height:7,borderRadius:"50%",background:demoMode ? "#fbbf24" : "#666",boxShadow:demoMode ? "0 0 8px #fbbf24" : "none"}} />{demoMode ? "DEMO MODE" : "LIVE MODE"}</button>{isAuthenticated ? <div className="top-avatar">{user?.name?.slice(0, 1) || "A"}</div> : <Button onClick={() => startLogin()} className="login-btn">Sign in</Button>}</div></header>
       <div className="content">{page}</div>
     </main>
   </div>;
 }
 function BellIcon() { return <Siren size={17} />; }
 
-function Dashboard({ onNavigate }: { onNavigate: (x: string) => void }) { const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 }); const activeCount = telemetry.data?.alerts?.length ? String(telemetry.data.alerts.length) : "12"; return <div className="page"><div className="hero-row"><div><p className="eyebrow">WED · 19 AUG 2026 / 09:49 UTC · TELEMETRY LINK ACTIVE</p><h1>Good morning, <span>Analyst.</span></h1><p className="muted">Your network is being watched. Here is the signal.</p></div><Button className="outline-btn" onClick={() => onNavigate("Threat Query")}><Sparkles size={16} /> Ask RAGSec</Button></div><div className="stat-grid"><MiniStat label="Active alerts" value={activeCount} tone="pink" sub="+3 in last hour" /><MiniStat label="Critical incidents" value="02" tone="red" sub="1 escalated" /><MiniStat label="Protected endpoints" value="248" tone="cyan" sub="98.4% reporting" /><MiniStat label="SOC productivity" value="2.711" tone="lime" sub="+14.8% this week" /></div><div className="dashboard-grid"><section className="panel threat-panel"><SectionTitle eyebrow="THREAT LANDSCAPE / 24H" title="Signal intensity" action={<span className="live-tag"><span className="pulse" /> LIVE</span>} /><div className="heatmap"><div className="heat-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div><div className="heat-grid">{Array.from({ length: 96 }, (_, i) => <i key={i} style={{ opacity: 0.18 + ((i * 17) % 80) / 100, background: i % 11 === 0 ? "#ff3da9" : i % 5 === 0 ? "#47eaff" : "#8c4dff" }} />)}</div><div className="heat-legend"><span><i className="legend-dot cyan" /> Ingested 84.2K</span><span><i className="legend-dot pink" /> Suspicious 1,284</span><span><i className="legend-dot red" /> Critical 38</span></div></div></section><section className="panel sps-panel"><SectionTitle eyebrow="AI PERFORMANCE / SPS" title="Productivity score" action={<button className="ghost-btn"><RefreshCw size={14} /></button>} /><div className="gauge-wrap"><div className="gauge"><div className="gauge-inner"><strong>2.711</strong><span>OUT OF 3.0</span></div></div><div className="gauge-copy"><p>Governed RAG pipeline</p><small>Target threshold <b>2.400</b></small></div></div><div className="metric-row"><div><span>Factual alignment</span><b>94.2%</b><Progress value={94} /></div><div><span>Triage efficiency</span><b>87.8%</b><Progress value={88} /></div></div></section></div><div className="lower-grid"><section className="panel"><SectionTitle eyebrow="ACTIVE QUEUE" title="Recent incidents" action={<button className="text-btn" onClick={() => onNavigate("Incidents")}>View all <ArrowUpRight size={14} /></button>} /><div className="incident-list">{incidents.map(i => <div className="incident-row" key={i.id}><div className={`incident-marker ${i.severity.toLowerCase()}`}><Siren size={15} /></div><div className="incident-main"><div><b>{i.title}</b><span>{i.id} · {i.time}</span></div><div className="incident-meta"><Severity value={i.severity} /><span className="techniques">{i.techniques.map(t => <code key={t}>{t}</code>)}</span></div></div><span className="state-text">{i.state}</span><ChevronRight size={16} /></div>)}</div></section><section className="panel"><SectionTitle eyebrow="AUTONOMOUS RESPONSE" title="Action stream" action={<span className="muted mono">LAST 60 MIN</span>} /><div className="action-stream"><div><span className="stream-time">09:47:19</span><span className="stream-icon good"><ShieldCheck size={14} /></span><p><b>IP block staged</b><small>185.220.101.4 · Edge Firewall</small></p><span className="stream-state">AUTO</span></div><div><span className="stream-time">09:42:08</span><span className="stream-icon warn"><LockKeyhole size={14} /></span><p><b>Host quarantine requested</b><small>FIN-WS-042 · Approval required</small></p><span className="stream-state pending">PENDING</span></div><div><span className="stream-time">09:31:45</span><span className="stream-icon good"><CheckCircle2 size={14} /></span><p><b>Process terminated</b><small>powershell.exe · OPS-SRV-07</small></p><span className="stream-state">AUTO</span></div></div></section></div></div> }
+function Dashboard({ onNavigate, demoMode }: { onNavigate: (x: string) => void; demoMode?: boolean }) {
+    const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 });
+    const data = telemetry.data;
+    const activeCount = demoMode ? "12" : data?.incidents?.length ? String(data.incidents.length) : "0";
+    const criticalCount = demoMode ? "3" : data?.metrics?.critical_incidents ? String(data.metrics.critical_incidents) : "0";
+    const protectedCount = demoMode ? "48" : data?.metrics?.device_count ? String(data.metrics.device_count) : "7";
+    
+    // Fallbacks to empty arrays
+    const liveIncidents = demoMode ? incidents : (data?.incidents || []);
+    const liveFim = demoMode ? fim : (data?.fim || []);
+    const logs: string[] = []; // Not implemented in MVP yet
+    
+    return <div className="page">
+      {demoMode && (
+        <div style={{padding:"0.75rem 1rem",background:"rgba(255,184,0,0.1)",border:"1px solid #f59e0b",borderRadius:6,marginBottom:"1rem",color:"#fbbf24",fontSize:"0.8rem",display:"flex",alignItems:"center",gap:8}}>
+          <Flame size={16} />
+          <b>DEMO TELEMETRY ACTIVE:</b> You are viewing the synthetic cybersecurity demonstration dataset. Toggle top-right to switch to Live Real Telemetry.
+        </div>
+      )}
+      <div className="hero-row">
+        <div>
+          <p className="eyebrow">{demoMode ? "DEMO MODE · SYNTHETIC TELEMETRY FIXTURES" : "LIVE MODE · REAL FILESYSTEM & DATABASE ACTIVE"}</p>
+          <h1>Good morning, <span>Analyst.</span></h1>
+          <p className="muted">Your network is being watched. Here is the signal.</p>
+        </div>
+        <Button className="outline-btn" onClick={() => onNavigate("Threat Query")}><Sparkles size={16} /> Ask RAGSec</Button>
+      </div>
+      
+      <div className="stat-grid">
+        <MiniStat label="Active alerts" value={activeCount} tone="pink" sub={demoMode ? "Demo" : "Live"} />
+        <MiniStat label="Critical incidents" value={criticalCount} tone="red" sub={demoMode ? "Demo" : "Live"} />
+        <MiniStat label="Protected endpoints" value={protectedCount} tone="cyan" sub={demoMode ? "Demo" : "Live"} />
+        <MiniStat label="SOC productivity" value={demoMode ? "94% efficiency" : "Not yet measured"} tone="lime" sub="" />
+      </div>
+      
+      <div className="dashboard-grid">
+        <section className="panel threat-panel">
+          <SectionTitle eyebrow="THREAT LANDSCAPE / 24H" title="Signal intensity" action={<span className="live-tag"><span className="pulse" /> LIVE</span>} />
+          <div className="heatmap">
+            <div className="heat-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+            <div className="heat-grid">{Array.from({ length: 96 }, (_, i) => <i key={i} style={{ opacity: 0.18 + ((i * 17) % 80) / 100, background: i % 11 === 0 ? "#ff3da9" : i % 5 === 0 ? "#47eaff" : "#8c4dff" }} />)}</div>
+            <div className="heat-legend">
+              <span><i className="legend-dot cyan" /> Ingested {data?.metrics?.total_events || 0}</span>
+              <span><i className="legend-dot pink" /> FIM Events {data?.metrics?.fim_events || 0}</span>
+              <span><i className="legend-dot red" /> Incidents {data?.metrics?.total_incidents || 0}</span>
+            </div>
+          </div>
+        </section>
+        
+        <section className="panel sps-panel">
+          <SectionTitle eyebrow="AI PERFORMANCE / SPS" title="Productivity score" action={<button className="ghost-btn"><RefreshCw size={14} /></button>} />
+          <div className="gauge-wrap" style={{opacity: 0.5}}>
+            <div className="gauge"><div className="gauge-inner"><strong style={{fontSize:"1.5rem"}}>Not measured</strong><span>OUT OF 3.0</span></div></div>
+            <div className="gauge-copy"><p>Governed RAG pipeline</p><small>Target threshold <b>2.400</b></small></div>
+          </div>
+          <div className="metric-row" style={{opacity: 0.5}}>
+            <div><span>Factual alignment</span><b>N/A</b><Progress value={0} /></div>
+            <div><span>Triage efficiency</span><b>N/A</b><Progress value={0} /></div>
+          </div>
+        </section>
+      </div>
+      
+      <div className="lower-grid">
+        <section className="panel">
+          <SectionTitle eyebrow="ACTIVE QUEUE" title="Recent incidents" action={<button className="text-btn" onClick={() => onNavigate("Incidents")}>View all <ArrowUpRight size={14} /></button>} />
+          <div className="incident-list">
+            {liveIncidents.length === 0 && <div className="muted" style={{padding:"2rem",textAlign:"center"}}>No incidents active.</div>}
+            {liveIncidents.map((i: any) => <div className="incident-row" key={i.id}>
+              <div className={`incident-marker ${(i.threat_classification?.severity || 'medium').toLowerCase()}`}><Siren size={15} /></div>
+              <div className="incident-main">
+                <p>{i.title}</p>
+                <div className="incident-meta">
+                  <Severity value={i.severity} />
+                  <span className="incident-id">{i.id}</span>
+                  <Status value={i.state} />
+                </div>
+              </div>
+              <div className="incident-tail"><span>{i.time}</span><span>{i.owner}</span></div>
+              <button className="icon-button"><ChevronRight size={16}/></button>
+            </div>)}
+          </div>
+        </section>
+        
+        <section className="panel">
+          <SectionTitle eyebrow="FILE INTEGRITY MONITORING" title="File system activity" action={<button className="text-btn" onClick={() => onNavigate("FIM Monitor")}>View all <ArrowUpRight size={14} /></button>} />
+          <div className="fim-list">
+            {liveFim.length === 0 && <div className="muted" style={{padding:"2rem",textAlign:"center"}}>No FIM activity monitored.</div>}
+            {liveFim.map((f: any, idx: number) => {
+              const formattedTime = f.time || (f.timestamp ? new Date(f.timestamp).toLocaleTimeString() : "Now");
+              const host = f.host || f.device_id || "local";
+              const action = (f.action || f.canonical?.action || "unknown").toLowerCase();
+              const path = f.path || f.canonical?.file_path || f.title || "unknown";
+              const isRisk = (f.risk || f.canonical?.risk_score || 0) > 50;
+              const judgment = f.judgment || (isRisk ? "Suspicious" : "Benign");
+              return (
+                <div className="fim-row" key={f.id || idx}>
+                  <div className="fim-main">
+                    <span className="fim-time">{formattedTime}</span>
+                    <span className="fim-host">{host}</span>
+                    <span className={`fim-action ${action}`}>{action.toUpperCase()}</span>
+                    <p className="fim-path">{path}</p>
+                  </div>
+                  <div className="fim-meta">
+                    {isRisk ? <span className="risk-score">RISK {f.risk || f.canonical?.risk_score}</span> : null}
+                    <span className={`fim-badge ${isRisk ? 'suspect' : 'benign'}`}>{judgment}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        
+        <section className="panel col-span-2">
+          <SectionTitle eyebrow="AUTONOMOUS RESPONSE" title="Action stream" action={<span className="metric-tag">LAST 60 MIN</span>} />
+          <div className="stream-list">
+            {logs.length === 0 && <div className="muted" style={{padding:"2rem",textAlign:"center"}}>No autonomous actions.</div>}
+          </div>
+        </section>
+      </div>
+    </div>;
+  }
 
-function ThreatQuery({ query, setQuery, sentQuery, setSentQuery, answer }: any) { const rag = trpc.soc.askRag.useMutation(); const displayedAnswer = rag.data?.answer || (rag.isPending ? "Retrieving evidence and validating citations…" : "Submit a query to retrieve evidence-grounded analysis from the private knowledge base."); const send = () => { if (query.trim()) { setSentQuery(query); rag.mutate({ query, severity: "Medium" }); setQuery(""); } }; return <div className="page"><SectionTitle eyebrow="RAGSEC CO-PILOT / GROUNDED INTELLIGENCE" title="Ask the knowledge base" action={<div className="confidence-pill"><span className="pulse" /> EVIDENCE MODE · ON</div>} /><div className="query-grid"><section className="panel query-panel"><div className="query-top"><div className="ai-orb"><Sparkles size={23} /></div><div><b>RAGSec Investigator</b><span>Plan-and-solve reasoning · CRC verified</span></div><Badge>PRIVATE ENCLAVE</Badge></div><div className="chat-area"><div className="query-bubble"><span className="bubble-label">YOU · 09:49</span>{sentQuery}</div><div className="answer-block"><div className="answer-head"><div className="ai-mini"><Bot size={15} /></div><span>RAGSEC · GROUNDED ANSWER</span><div className="answer-score">CONFIDENCE {rag.data ? Math.round(rag.data.confidence * 100) / 100 : "0.94"}</div></div><Streamdown>{displayedAnswer}</Streamdown><div className="citation-row">{rag.data?.citations?.length ? rag.data.citations.map((citation: string) => <button key={citation}>[{citation}] Evidence source <ArrowUpRight size={12} /></button>) : <span className="muted mono">Citations will appear after retrieval.</span>}</div><div className="abstention-note">{rag.data?.abstained ? <AlertTriangle size={15} /> : <ShieldCheck size={15} />}<span>{rag.data?.abstained ? "Abstention state · evidence did not clear the severity threshold" : "CRC verification passed · citations checked against retrieved sources"}</span></div></div></div><div className="query-compose"><Textarea value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="Ask about an IOC, alert, CVE, technique, or policy…" /><Button onClick={send}><Send size={15} /> Investigate</Button></div><div className="suggestions"><span>TRY A QUERY</span><button onClick={() => setQuery("Find related activity for hash a9f2c3…c31e")}>Related hash activity</button><button onClick={() => setQuery("What is the containment SOP for T1486?")}>Containment SOP</button><button onClick={() => setQuery("Show CVEs affecting DMZ-WEB-03")}>Affected CVEs</button></div></section><aside className="panel evidence-panel"><SectionTitle eyebrow="RETRIEVAL TRACE" title="Evidence graph" /><div className="trace-graph"><div className="trace-node root"><Sparkles size={16} /><b>QUERY</b><small>semantic intent</small></div><div className="trace-line" /><div className="trace-node"><FileKey2 size={16} /><b>3 CHUNKS</b><small>reranked · 0.94</small></div><div className="trace-line" /><div className="trace-node"><LockKeyhole size={16} /><b>MASKING</b><small>12 tokens protected</small></div><div className="trace-line" /><div className="trace-node final"><ShieldCheck size={16} /><b>CRC PASS</b><small>citations verified</small></div></div><div className="evidence-list"><div><span className="source-kind">FIM</span><p><b>fim-7a91</b><small>File Integrity Events · 09:47</small></p><strong>0.97</strong></div><div><span className="source-kind cyan-kind">IDS</span><p><b>ids-2c04</b><small>Network Telemetry · 09:48</small></p><strong>0.94</strong></div><div><span className="source-kind purple-kind">SOP</span><p><b>sop-91d2</b><small>Internal Policy · v4.2</small></p><strong>0.89</strong></div></div><div className="threshold-box"><span>ABSTENTION THRESHOLD</span><b>0.85 <small>θsim</small></b><Progress value={94} /></div></aside></div></div> }
+function ThreatQuery({ query, setQuery, sentQuery, setSentQuery }: any) {
+  const queryApi = trpc.soc.queryPhase7.useMutation();
+  
+  const send = () => {
+    if (query.trim()) {
+      setSentQuery(query);
+      queryApi.mutate({ query });
+      setQuery("");
+    }
+  };
+  
+  const evidence = queryApi.data?.evidence || [];
+  const answer = queryApi.data?.answer || "";
+  const gov = queryApi.data?.governance || null;
+  const status = queryApi.data?.status || "";
+  const confidence = queryApi.data?.confidence_score;
+  const isAbstained = status === "ABSTAINED";
+  
+  const GovCheck = ({ ok, label }: { ok: boolean | undefined; label: string }) => (
+    <li style={{color: ok === undefined ? "var(--text-muted)" : ok ? "var(--lime)" : "var(--pink)"}}>
+      {ok === undefined ? <CircleDashed size={14} /> : ok ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+      {" "}{label}
+    </li>
+  );
+  
+  return <div className="page">
+    <SectionTitle eyebrow="RAGSEC CO-PILOT / GROUNDED INTELLIGENCE" title="Ask the knowledge base" action={<div className="confidence-pill"><span className="pulse" /> EVIDENCE MODE · ON</div>} />
+    <div className="query-grid">
+      <section className="panel query-panel">
+        <div className="query-top"><div className="ai-orb"><Sparkles size={23} /></div><div><b>RAGSec Investigator</b><span>Evidence Retrieval · Reranking · Grounded Generation</span></div><Badge>LOCAL INFERENCE</Badge></div>
+        <div className="chat-area">
+          {sentQuery && <div className="query-bubble"><span className="bubble-label">YOU</span>{sentQuery}</div>}
+          
+          <div className="answer-block">
+            <div className="answer-head"><div className="ai-mini"><Bot size={15} /></div><span>RAGSEC · {queryApi.isPending ? "THINKING..." : "RESPONSE"}</span>{!queryApi.isPending && status && <Badge style={{marginLeft:8}} variant={isAbstained ? "destructive" : "default"}>{status}</Badge>}{!queryApi.isPending && confidence !== undefined && <span style={{marginLeft:8,fontSize:"0.7rem",color:"var(--text-muted)"}}>CONFIDENCE: {(confidence * 100).toFixed(1)}%</span>}</div>
+            
+            {queryApi.isPending && <div style={{padding: "1rem"}} className="muted">Running retrieval → reranking → evidence gating → LLM generation → CRC verification...</div>}
+            
+            {answer && !queryApi.isPending && (
+              <div className="answer-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                  table: ({node, ...props}) => <div className="overflow-x-auto"><table className="border-collapse border border-gray-700 w-full" {...props} /></div>,
+                  th: ({node, ...props}) => <th className="border border-gray-600 bg-gray-800 px-4 py-2" {...props} />,
+                  td: ({node, ...props}) => <td className="border border-gray-700 px-4 py-2" {...props} />,
+                  a: ({node, ...props}) => <a className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
+                }}>
+                  {answer}
+                </ReactMarkdown>
+              </div>
+            )}
+            {!queryApi.isPending && !answer && <div style={{padding: "1rem"}} className="muted">Submit a query to generate an AI response grounded in the knowledge base.</div>}
+            
+            {!queryApi.isPending && gov?.warnings && gov.warnings.length > 0 && <div style={{padding: "0.75rem 1rem", background: "rgba(255,61,169,0.1)", borderLeft: "3px solid var(--pink)", margin: "0.5rem 1rem", fontSize: "0.8rem"}}>
+              <b>⚠ Verification Warnings:</b>
+              {gov.warnings.map((w: string, i: number) => <div key={i} style={{marginTop:4}}>{w}</div>)}
+            </div>}
+            
+            {!queryApi.isPending && evidence.length > 0 && <div className="evidence-trace-ui" style={{marginTop: "1.5rem", borderTop: "1px solid var(--border)", paddingTop: "1rem"}}>
+              <h4 style={{fontSize: "0.75rem", letterSpacing: "1px", color: "var(--cyan)", marginBottom: "1rem"}}>CITATIONS / EVIDENCE TRACE</h4>
+              {evidence.map((e: any, i: number) => (
+                <div key={e.chunk_id || i} style={{padding: "1rem", border: "1px solid var(--border)", margin: "0.5rem 0", borderRadius: "4px", background: "rgba(0,0,0,0.2)"}}>
+                  <div style={{display: "flex", justifyContent: "space-between", marginBottom: "0.5rem"}}>
+                    <b><FileKey2 size={12} style={{display:"inline", marginRight:4}}/> [{e.citation_tag || "C"+(i+1)}] {e.source_name || e.source}</b>
+                    <div style={{display:"flex", gap: "10px"}}>
+                      {e.rerank_score != null && <span style={{fontSize: "0.75rem", color: "var(--pink)"}}>RERANK: {Number(e.rerank_score).toFixed(2)}</span>}
+                      {e.dense_score != null && <span style={{fontSize: "0.75rem", color: "var(--text-muted)"}}>DENSE: {Number(e.dense_score).toFixed(2)}</span>}
+                    </div>
+                  </div>
+                  <div style={{fontSize: "0.8rem", color: "var(--text-muted)", fontFamily: "var(--mono)", marginBottom: "0.5rem"}}>
+                    Entities: {e.entities ? e.entities.join(", ") : (e.extracted_entities || []).join(", ") || "None"}
+                  </div>
+                  <p style={{fontSize: "0.85rem", lineHeight: 1.5}}>{e.masked_text || e.text || e.chunk_text}</p>
+                </div>
+              ))}
+            </div>}
+          </div>
+        </div>
+        <div className="query-compose">
+          <textarea value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }}} placeholder="Ask about recent threats, IOCs, or affected hosts..." />
+          <button className="pink-btn" onClick={send} disabled={queryApi.isPending}><Sparkles size={14} /> {queryApi.isPending ? "Generating..." : "Generate"}</button>
+        </div>
+      </section>
+      <aside className="panel nav-panel">
+        <div className="side-label">GOVERNANCE</div>
+        <ul className="gov-list">
+          <GovCheck ok={gov ? gov.identity_verified : undefined} label="Identity verified" />
+          <GovCheck ok={gov ? gov.pii_masked : undefined} label="PII masking active" />
+          <GovCheck ok={gov ? gov.cross_encoder_active : undefined} label="Cross-encoder alignment" />
+          <GovCheck ok={gov ? (gov.citation_check === "VERIFIED" || gov.citation_check === "PARTIAL") : undefined} label={`Citation check${gov?.citation_check ? ` (${gov.citation_check})` : ""}`} />
+        </ul>
+        {gov?.gating && <div style={{marginTop:"1rem",padding:"0.5rem",fontSize:"0.7rem",borderTop:"1px solid var(--border)"}}>
+          <div>Gating: <b style={{color: gov.gating === "PASSED" ? "var(--lime)" : "var(--pink)"}}>{gov.gating}</b></div>
+          {gov.gating_reason && <div style={{color:"var(--pink)",marginTop:4}}>{gov.gating_reason}</div>}
+        </div>}
+      </aside>
+    </div>
+  </div>;
+}
 
-function Alerts({ onSelect, selected, flash }: any) { const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 }); const feedAlerts = telemetry.data?.alerts?.length ? telemetry.data.alerts.map((a, i) => ({ ...alerts[i % alerts.length], ...a, id: a.alertKey, age: "live", tactic: "Telemetry" })) : alerts; return <div className="page"><SectionTitle eyebrow="DETECTION & TRIAGE / 12 ACTIVE" title="Alert queue" action={<div className="action-group"><Button className="outline-btn"><Filter size={14} /> Filters</Button><Button className="pink-btn" onClick={() => flash("Ingestion endpoint is ready for connector data") }><Plus size={15} /> Ingest alert</Button></div>} /><div className="filter-strip"><div className="filter-active">ALL <b>12</b></div><div>CRITICAL <b className="pink-text">2</b></div><div>HIGH <b>4</b></div><div>MEDIUM <b>5</b></div><div>LOW <b>1</b></div><div className="filter-search"><Search size={14} /><input placeholder="Filter alerts…" /></div></div><div className="panel table-panel"><table><thead><tr><th>Alert</th><th>Asset</th><th>Severity</th><th>Status</th><th>ATT&CK</th><th>Age</th><th /></tr></thead><tbody>{feedAlerts.map(a => <tr key={a.id} className={selected.id === a.id ? "row-selected" : ""} onClick={() => onSelect(a)}><td><div className="table-title"><span className="alert-signal" /><b>{a.title}</b><small>{a.id} · SHA {a.hash}</small></div></td><td><span className="mono">{a.host}</span></td><td><Severity value={a.severity} /></td><td><Status value={a.status} /></td><td><code>{a.tactic}</code></td><td className="muted">{a.age}</td><td><ChevronRight size={16} /></td></tr>)}</tbody></table></div><div className="detail-drawer panel"><div><p className="eyebrow">SELECTED ALERT / {selected.id}</p><h3>{selected.title}</h3><p className="muted">Correlated entity <b className="text-white">{selected.host}</b> · Source confidence <b className="cyan-text">0.94</b></p></div><div className="drawer-actions"><Severity value={selected.severity} /><Button className="outline-btn" onClick={() => flash(`Investigation started for ${selected.id}`)}><Sparkles size={14} /> Investigate</Button><Button className="pink-btn" onClick={() => flash("Mitigation approval requested") }><Zap size={14} /> Contain</Button></div></div></div> }
+function Knowledge({ flash }: { flash: (t: string) => void }) {
+  const sources = trpc.soc.listSources.useQuery();
+  const upload = trpc.soc.uploadKnowledgeSource.useMutation({ onSuccess: () => { flash("Document ingested"); sources.refetch(); }});
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; const reader = new FileReader(); reader.onload = () => { const b64 = (reader.result as string).split(",")[1]; upload.mutate({ name: f.name, mimeType: f.type || "text/plain", base64: b64 }); }; reader.readAsDataURL(f); };
+  return <div className="page"><SectionTitle eyebrow="KNOWLEDGE BASE / CTI CORPUS" title="Ingested sources" action={<label className="pink-btn" style={{cursor:"pointer"}}><CloudUpload size={14} /> Upload<input type="file" hidden onChange={handleUpload} /></label>} />
+    <div className="incident-list">{(sources.data || []).map((s: any) => <div className="incident-row" key={s.id}><div className="incident-marker medium"><Database size={15} /></div><div className="incident-main"><div><b>{s.name}</b><span>{s.id}</span></div><div className="incident-meta"><span>{s.chunkCount} chunks</span><span className="techniques">{(s.extractedEntities || []).slice(0,5).map((e: string) => <code key={e}>{e}</code>)}</span></div></div><Badge>{s.ingestionStatus}</Badge></div>)}</div>
+  </div>;
+}
 
-function Incidents({ flash }: { flash: (x: string) => void }) { const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 }); const incidentFeed = telemetry.data?.incidents?.length ? telemetry.data.incidents.map((i, idx) => ({ ...incidents[idx % incidents.length], ...i, id: i.incidentKey, state: i.status })) : incidents; return <div className="page"><SectionTitle eyebrow="CASE MANAGEMENT / 3 OPEN" title="Incident workspace" action={<Button className="pink-btn" onClick={() => flash("New incident draft created") }><Plus size={15} /> New incident</Button>} /><div className="incident-workspace"><div className="panel case-list">{incidentFeed.map((i, idx) => <div className={`case-card ${idx === 0 ? "case-active" : ""}`} key={i.id}><div className="case-top"><Severity value={i.severity} /><span>{i.time}</span></div><b>{i.title}</b><small>{i.id} · Owner {i.owner}</small><div className="case-bottom"><span>{i.techniques.join(" · ")}</span><Status value={i.state === "Escalated" ? "Investigating" : "Investigating"} /></div></div>)}</div><div className="panel investigation"><div className="investigation-head"><div><p className="eyebrow">INC-2026-019 / CRITICAL</p><h3>Active encryption chain on Finance subnet</h3></div><Button className="outline-btn" onClick={() => flash("Incident escalation recorded in immutable audit") }><Siren size={14} /> Escalate</Button></div><div className="incident-tags"><Severity value="Critical" /><span className="tag">T1486 · Data Encrypted for Impact</span><span className="tag">T1059.001 · PowerShell</span><span className="tag">Owner: M. Chen</span></div><div className="timeline"><div><span className="timeline-dot red-dot" /><div><small>09:48 · RAGSEC JUDGMENT</small><p>Cross-encoder found 3 corroborating sources. Automatic abstention bypassed due to high confidence. <b>[ids-2c04]</b></p></div></div><div><span className="timeline-dot pink-dot" /><div><small>09:46 · ANALYST NOTE / M. CHEN</small><p>Finance subnet shows simultaneous file writes on 4 hosts. Preserve memory before isolation.</p></div></div><div><span className="timeline-dot cyan-dot" /><div><small>09:42 · INGESTION ENGINE</small><p>Critical alert created from FIM and IDS correlation. Notification sent to security owner.</p></div></div></div><div className="note-compose"><Input placeholder="Add an analyst note…" /><Button className="outline-btn" onClick={() => flash("Note appended to incident timeline")}>Add note</Button></div></div></div></div> }
+function Audit() {
+  const audit = trpc.soc.immutableAudit.useQuery();
+  return <div className="page"><SectionTitle eyebrow="GOVERNANCE / AUDIT" title="Immutable audit trail" />
+    <div className="incident-list">{(audit.data || []).map((a: any) => <div className="incident-row" key={a.id}><div className="incident-marker low"><ClipboardCheck size={15} /></div><div className="incident-main"><div><b>{a.action}</b><span>{a.target}</span></div><div className="incident-meta"><span>{a.result}</span><code style={{fontSize:"0.6rem"}}>{a.chainHash}</code></div></div><span className="state-text">{new Date(a.createdAt).toLocaleTimeString()}</span></div>)}</div>
+  </div>;
+}
 
-function FIM() { const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 }); const fimRows = telemetry.data?.fim?.length ? telemetry.data.fim.map((e, i) => ({ ...fim[i % fim.length], ...e, time: "LIVE", hash: "telemetry" })) : fim; return <div className="page"><SectionTitle eyebrow="FILE INTEGRITY MONITORING / LIVE FEED" title="Host file changes" action={<div className="live-tag"><span className="pulse" /> STREAMING</div>} /><div className="fim-summary"><MiniStat label="Events / hour" value="1,842" tone="cyan" sub="+18.4% baseline" /><MiniStat label="Anomalous" value="24" tone="pink" sub="4 critical risk" /><MiniStat label="Collectors" value="248/248" tone="lime" sub="100% healthy" /></div><div className="panel table-panel"><table><thead><tr><th>Time</th><th>Host</th><th>Path</th><th>Change</th><th>SHA-256</th><th>Risk</th><th>Judgment</th></tr></thead><tbody>{fimRows.map(e => <tr key={e.time + e.host}><td className="mono muted">{e.time}</td><td><b>{e.host}</b></td><td className="path-cell">{e.path}</td><td><span className="change-pill">{e.action}</span></td><td className="mono muted">{e.hash}</td><td><div className="risk"><Progress value={e.risk} /><b>{e.risk}</b></div></td><td><Status value={e.judgment === "Suspicious" ? "Investigating" : "Resolved"} /></td></tr>)}</tbody></table></div></div> }
-function Fleet() { const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 }); const hosts = telemetry.data?.fleet?.length ? telemetry.data.fleet.map(h => ({ n: h.hostname, os: h.os || "Unknown OS", ip: h.ip || "—", last: "live", alerts: h.agentStatus === "Compromised" ? 4 : h.agentStatus === "At risk" ? 2 : 1, state: h.agentStatus })) : [{ n: "FIN-WS-042", os: "Windows 11 Enterprise", ip: "10.24.8.42", last: "12 sec ago", alerts: 4, state: "Compromised" }, { n: "DMZ-WEB-03", os: "Ubuntu 24.04 LTS", ip: "10.24.3.19", last: "31 sec ago", alerts: 2, state: "At risk" }, { n: "ENG-LT-019", os: "macOS 15.5", ip: "10.24.7.19", last: "2 min ago", alerts: 3, state: "At risk" }, { n: "OPS-SRV-07", os: "Windows Server 2022", ip: "10.24.2.7", last: "8 sec ago", alerts: 1, state: "Healthy" }]; return <div className="page"><SectionTitle eyebrow="ENDPOINT REGISTRY / 248 ASSETS" title="Fleet overview" action={<Button className="outline-btn"><RefreshCw size={14} /> Sync fleet</Button>} /><div className="fleet-map panel"><div className="map-grid" /><div className="map-center"><Radar size={28} /><span>CORE / PRIVATE ENCLAVE</span></div>{hosts.map((h, i) => <div className={`map-node node-${i} ${h.state === "Compromised" ? "node-red" : h.state === "At risk" ? "node-pink" : "node-green"}`} key={h.n}><span className="node-ring"><Server size={14} /></span><b>{h.n}</b></div>)}</div><div className="asset-grid">{hosts.map(h => <div className="panel asset-card" key={h.n}><div className="asset-head"><span className={`asset-status ${h.state === "Healthy" ? "green" : h.state === "Compromised" ? "red" : "pink"}`} /><b>{h.n}</b><span className="mono muted">{h.ip}</span></div><div className="asset-body"><span>{h.os}</span><span>Last seen <b>{h.last}</b></span><span>Open alerts <b className={h.alerts > 2 ? "pink-text" : ""}>{h.alerts}</b></span></div><button className="text-btn">View telemetry <ArrowUpRight size={13} /></button></div>)}</div></div> }
-function Mitigation({ flash }: { flash: (x: string) => void }) { const telemetry = trpc.soc.telemetrySnapshot.useQuery(undefined, { refetchInterval: 12000 }); const playbooks = [{ name: "Isolate compromised endpoint", desc: "Block lateral movement while preserving forensic access.", icon: LockKeyhole, risk: "HIGH IMPACT", approval: true }, { name: "Block malicious source IP", desc: "Push deny rule to edge firewall and all egress gateways.", icon: ShieldAlert, risk: "LOW RISK", approval: false }, { name: "Terminate suspicious process", desc: "Kill process tree on endpoint agent and capture metadata.", icon: Flame, risk: "MEDIUM RISK", approval: true }]; return <div className="page"><SectionTitle eyebrow="RESPONSE ORCHESTRATION / CONTROLLED ACTIONS" title="Mitigation center" action={<div className="confidence-pill"><LockKeyhole size={13} /> APPROVAL GATED</div>} /><div className="playbook-grid">{playbooks.map(p => <div className="panel playbook" key={p.name}><div className="playbook-icon"><p.icon size={20} /></div><div className="playbook-head"><b>{p.name}</b><span className={p.approval ? "pink-text" : "cyan-text"}>{p.risk}</span></div><p>{p.desc}</p><div className="playbook-foot"><span>{telemetry.data?.actions?.[playbooks.indexOf(p)]?.status || (p.approval ? "Analyst approval required" : "Can run automatically")}</span><Button className="outline-btn" onClick={() => flash(p.approval ? "Approval request submitted to incident commander" : "Dry-run completed · no changes applied")}><Play size={13} /> {p.approval ? "Request" : "Run dry-run"}</Button></div></div>)}</div><div className="panel execution-panel"><SectionTitle eyebrow="EXECUTION LOG" title="Recent actions" /><div className="execution-row"><CheckCircle2 size={16} /><b>IP block staged</b><span>185.220.101.4</span><code>FW-EDGE-01</code><small>09:47:19 · automated</small></div><div className="execution-row pending-row"><LockKeyhole size={16} /><b>Host quarantine pending</b><span>FIN-WS-042</span><code>INC-2026-019</code><small>09:42:08 · approval required</small></div></div></div> }
-function Knowledge({ flash }: { flash: (x: string) => void }) { return <div className="page"><SectionTitle eyebrow="GOVERNED SOURCES / 184 DOCUMENTS" title="Knowledge base" action={<Button className="pink-btn" onClick={() => flash("Upload pipeline opened · PDF and TXT accepted") }><CloudUpload size={15} /> Upload source</Button>} /><div className="kb-grid"><div className="panel upload-zone"><CloudUpload size={26} /><h3>Drop threat intelligence here</h3><p>PDF and plain-text sources are encrypted in transit, stored in S3, parsed with domain-aware chunking, and indexed with entity metadata.</p><Button className="outline-btn" onClick={() => flash("Upload pipeline opened · PDF and TXT accepted")}>Choose files</Button><small>MAX 50 MB · PDF / TXT · PRIVATE ENCLAVE</small></div><div className="panel"><SectionTitle eyebrow="SOURCE HEALTH" title="Coverage" /><div className="coverage"><div><span>MITRE ATT&CK</span><b>98%</b><Progress value={98} /></div><div><span>CVE intelligence</span><b>91%</b><Progress value={91} /></div><div><span>Internal SOPs</span><b>84%</b><Progress value={84} /></div></div></div></div><div className="panel table-panel"><table><thead><tr><th>Source</th><th>Type</th><th>Chunks</th><th>Entities</th><th>Freshness</th><th>Status</th></tr></thead><tbody>{[["MITRE ATT&CK Enterprise v15.1", "JSON / normalized", "12,481", "8,921", "12 min ago", "Indexed"], ["CISA Known Exploited Vulnerabilities", "PDF / feed", "4,208", "3,102", "1 hour ago", "Indexed"], ["Finance Incident Response SOP", "PDF / internal", "842", "388", "2 days ago", "Indexed"], ["Endpoint Hardening Standard", "TXT / internal", "236", "94", "3 days ago", "Indexed"]].map(r => <tr key={r[0]}><td><div className="table-title"><FileKey2 size={15} /><b>{r[0]}</b></div></td><td>{r[1]}</td><td className="mono">{r[2]}</td><td className="mono">{r[3]}</td><td className="muted">{r[4]}</td><td><span className="status status-resolved"><span className="dot" />{r[5]}</span></td></tr>)}</tbody></table></div></div> }
-function Audit() { return <div className="page"><SectionTitle eyebrow="GOVERNANCE / APPEND-ONLY" title="Immutable audit log" action={<div className="confidence-pill"><LockKeyhole size={13} /> WORM STORAGE ACTIVE</div>} /><div className="audit-banner"><LockKeyhole size={18} /><div><b>Evidence chain integrity verified</b><span>All actions are cryptographically chained. Edit and delete operations are disabled at the API boundary.</span></div><span className="mono">SHA-256 / 100%</span></div><div className="panel table-panel"><table><thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Target</th><th>Result</th><th>Chain hash</th></tr></thead><tbody>{[["09:48:22.110", "RAGSec Engine", "NOTIFY_OWNER", "ALT-10482", "Delivered", "8c41…0ad1"], ["09:47:19.445", "RAGSec Engine", "STAGE_IP_BLOCK", "185.220.101.4", "Awaiting approval", "91b2…d782"], ["09:46:03.009", "M. Chen", "ADD_NOTE", "INC-2026-019", "Committed", "2a71…fc19"], ["09:42:08.772", "RAGSec Engine", "CREATE_INCIDENT", "INC-2026-019", "Committed", "e4a2…113c"]].map(r => <tr key={r[0]}><td className="mono muted">{r[0]}</td><td><b>{r[1]}</b></td><td><code>{r[2]}</code></td><td>{r[3]}</td><td><span className="status status-resolved"><span className="dot" />{r[4]}</span></td><td className="mono muted">{r[5]}</td></tr>)}</tbody></table></div></div> }
-function Settings() { return <div className="page"><SectionTitle eyebrow="PLATFORM CONFIGURATION" title="Settings" /><div className="settings-grid"><div className="panel settings-nav"><button className="settings-active"><Users size={16} /> Team & roles</button><button><SlidersHorizontal size={16} /> Detection thresholds</button><button><BellIcon /> Notifications</button><button><Network size={16} /> Connectors</button></div><div className="panel settings-content"><p className="eyebrow">ACCESS CONTROL</p><h3>Team & roles</h3><p className="muted">RBAC is enforced at the procedure boundary. High-impact response actions require the Incident Commander role.</p><div className="role-row"><div className="avatar">MC</div><div><b>Maya Chen</b><span>Incident Commander · Tier 4</span></div><Badge>ADMIN</Badge></div><div className="role-row"><div className="avatar cyan-avatar">AR</div><div><b>Arjun Rao</b><span>SOC Analyst · Tier 3</span></div><Badge variant="outline">ANALYST</Badge></div><div className="role-row"><div className="avatar purple-avatar">JP</div><div><b>Jai Patel</b><span>Threat Hunter · Tier 3</span></div><Badge variant="outline">ANALYST</Badge></div></div></div></div> }
+function IncidentsPage() {
+  const q = trpc.soc.getIncidents.useQuery();
+  return <div className="page"><SectionTitle eyebrow="SOC QUEUE" title="Incidents" />
+    <div className="panel">
+      {q.isLoading && <div style={{padding:"2rem"}}>Loading incidents...</div>}
+      {!q.isLoading && (q.data || []).length === 0 && <div style={{padding:"2rem"}} className="muted">No incidents active.</div>}
+      <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
+        <thead><tr style={{borderBottom:"1px solid var(--border)"}}><th style={{padding:"0.5rem"}}>ID</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead>
+        <tbody>
+          {(q.data || []).map((i: any) => <tr key={i.id} style={{borderBottom:"1px solid var(--border)"}}>
+            <td style={{padding:"1rem 0.5rem",fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{i.id}</td>
+            <td>{i.title}</td>
+            <td><Severity value={i.threat_classification?.severity || "Medium"} /></td>
+            <td><Status value={i.status || "Open"} /></td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
+function AlertsPage() {
+  const q = trpc.soc.getEvents.useQuery();
+  return <div className="page"><SectionTitle eyebrow="SOC QUEUE" title="Security Alerts & Events" />
+    <div className="panel">
+      {q.isLoading && <div style={{padding:"2rem"}}>Loading alerts...</div>}
+      {!q.isLoading && (q.data || []).length === 0 && <div style={{padding:"2rem"}} className="muted">No security events found.</div>}
+      <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
+        <thead><tr style={{borderBottom:"1px solid var(--border)"}}><th style={{padding:"0.5rem"}}>Time</th><th>Source</th><th>Description</th></tr></thead>
+        <tbody>
+          {(q.data || []).map((e: any) => <tr key={e.id} style={{borderBottom:"1px solid var(--border)"}}>
+            <td style={{padding:"1rem 0.5rem",fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{new Date(e.timestamp).toLocaleString()}</td>
+            <td><Badge>{e.source_type}</Badge></td>
+            <td>{e.title || "Security Event"}</td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
+function FimMonitorPage({ demoMode }: { demoMode?: boolean }) {
+  const q = trpc.soc.getFimEvents.useQuery();
+  const rawEvents = demoMode ? [
+    { id: "demo-1", timestamp: new Date().toISOString(), device_id: "FIN-WS-042", canonical: { action: "CREATE", file_path: "C:\\Users\\Public\\invoice.exe", risk_score: 98 } },
+    { id: "demo-2", timestamp: new Date(Date.now() - 180000).toISOString(), device_id: "DMZ-WEB-03", canonical: { action: "MODIFY", file_path: "/var/www/html/.cache.php", risk_score: 86 } },
+    { id: "demo-3", timestamp: new Date(Date.now() - 300000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "CREATE", file_path: "C:\\Users\\Public\\ransom_note.txt", risk_score: 99 } },
+    { id: "demo-4", timestamp: new Date(Date.now() - 420000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "MODIFY", file_path: "C:\\Users\\Finance\\Q3_report.xlsx", risk_score: 65 } },
+    { id: "demo-5", timestamp: new Date(Date.now() - 600000).toISOString(), device_id: "FIN-WS-042", canonical: { action: "RENAME", file_path: "C:\\Backups\\db.zip -> db.locked", risk_score: 95 } },
+    { id: "demo-6", timestamp: new Date(Date.now() - 900000).toISOString(), device_id: "CORP-DC-01", canonical: { action: "DELETE", file_path: "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx", risk_score: 90 } }
+  ] : (q.data || []);
+
+  return <div className="page">
+    <SectionTitle eyebrow="FILE INTEGRITY" title="FIM Monitor" />
+    {demoMode && (
+      <div style={{padding:"0.75rem 1rem",background:"rgba(255,184,0,0.1)",border:"1px solid #f59e0b",borderRadius:6,marginBottom:"1rem",color:"#fbbf24",fontSize:"0.8rem",display:"flex",alignItems:"center",gap:8}}>
+        <Flame size={16} />
+        <b>DEMO TELEMETRY ACTIVE:</b> Showing synthetic FIM demonstration attack chain. Switch top-right toggle to LIVE MODE for real filesystem monitoring.
+      </div>
+    )}
+    <div className="panel">
+      {q.isLoading && !demoMode && <div style={{padding:"2rem"}}>Loading FIM data...</div>}
+      {!q.isLoading && rawEvents.length === 0 && <div style={{padding:"2rem"}} className="muted">No FIM events found. Try creating or deleting a file in the monitored workspace.</div>}
+      <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
+        <thead><tr style={{borderBottom:"1px solid var(--border)"}}><th style={{padding:"0.5rem"}}>Time</th><th>Host</th><th>Action</th><th>File Path</th><th>Risk</th></tr></thead>
+        <tbody>
+          {rawEvents.map((e: any) => <tr key={e.id} style={{borderBottom:"1px solid var(--border)"}}>
+            <td style={{padding:"1rem 0.5rem",fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{new Date(e.timestamp).toLocaleTimeString()}</td>
+            <td>{e.device_id || "local"}</td>
+            <td><span className={`fim-action ${e.canonical?.action?.toLowerCase() || ""}`}>{e.canonical?.action}</span></td>
+            <td style={{fontFamily:"var(--mono)",fontSize:"0.75rem"}}>{e.canonical?.file_path}</td>
+            <td>{e.canonical?.risk_score > 50 ? <span className="risk-score">RISK {e.canonical.risk_score}</span> : <span className="fim-badge benign">Benign</span>}</td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
+function FleetPage() {
+  const q = trpc.soc.getDevices.useQuery();
+  return <div className="page"><SectionTitle eyebrow="ASSET MANAGEMENT" title="Fleet" />
+    <div className="panel">
+      {q.isLoading && <div style={{padding:"2rem"}}>Loading fleet devices...</div>}
+      {!q.isLoading && (q.data || []).length === 0 && <div style={{padding:"2rem"}} className="muted">No devices reporting to the SOC.</div>}
+      <table style={{width:"100%",textAlign:"left",borderCollapse:"collapse"}}>
+        <thead><tr style={{borderBottom:"1px solid var(--border)"}}><th style={{padding:"0.5rem"}}>Hostname</th><th>IP</th><th>OS</th><th>Criticality</th></tr></thead>
+        <tbody>
+          {(q.data || []).map((d: any) => <tr key={d.id} style={{borderBottom:"1px solid var(--border)"}}>
+            <td style={{padding:"1rem 0.5rem"}}>{d.hostname}</td>
+            <td style={{fontFamily:"var(--mono)",fontSize:"0.8rem"}}>{d.ip_address}</td>
+            <td>{d.os_type || d.device_type}</td>
+            <td><Badge variant="outline">{d.criticality}</Badge></td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
+function MitigationPage() {
+  return <div className="page"><SectionTitle eyebrow="RESPONSE" title="Autonomous Mitigation" /><div className="panel" style={{padding:"2rem",textAlign:"center"}}><CircleDashed size={40} style={{opacity:0.3,marginBottom:"1rem"}} /><p className="muted">This feature requires Phase 8 (Autonomous Simulation) and is not yet implemented.</p></div></div>;
+}
+
+function SettingsPage() {
+  return <div className="page"><SectionTitle eyebrow="CONFIGURATION" title="Settings" /><div className="panel" style={{padding:"2rem",textAlign:"center"}}><p className="muted">System settings are currently managed via backend environment variables (config.py).</p></div></div>;
+}
+
+function StubPage({ name, demoMode }: { name: string; demoMode?: boolean }) {
+  if (name === "Incidents") return <IncidentsPage />;
+  if (name === "Alerts") return <AlertsPage />;
+  if (name === "FIM Monitor") return <FimMonitorPage demoMode={demoMode} />;
+  if (name === "Fleet") return <FleetPage />;
+  if (name === "Mitigation") return <MitigationPage />;
+  if (name === "Settings") return <SettingsPage />;
+  return <div className="page"><SectionTitle eyebrow="UNDER CONSTRUCTION" title={name} /><div className="panel" style={{padding:"2rem",textAlign:"center"}}><CircleDashed size={40} style={{opacity:0.3,marginBottom:"1rem"}} /><p className="muted">This module is scheduled for implementation in a future phase.</p></div></div>;
+}

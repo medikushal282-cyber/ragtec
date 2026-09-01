@@ -15,7 +15,10 @@ class VectorStore:
         self.client = chromadb.PersistentClient(path=persist_dir)
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
-            metadata={"hnsw:space": "cosine"}
+            metadata={
+                "hnsw:space": "cosine",
+                "embedding_model": settings.EMBEDDING_MODEL
+            }
         )
 
     def upsert_chunks(self, chunks: List[CanonicalChunk], embeddings: List[List[float]]):
@@ -52,18 +55,19 @@ class VectorStore:
         self,
         query_embedding: List[float],
         top_k: int = settings.RETRIEVAL_TOP_K,
-        allowed_tiers: Optional[List[SensitivityTier]] = None
+        filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Queries nearest neighbors in cosine space with sensitivity filtering.
+        Queries nearest neighbors in cosine space with metadata filtering.
         """
         where_clause = None
-        if allowed_tiers:
-            tier_values = [t.value for t in allowed_tiers]
-            if len(tier_values) > 1:
-                where_clause = {"sensitivity_tier": {"$in": tier_values}}
-            elif len(tier_values) == 1:
-                where_clause = {"sensitivity_tier": tier_values[0]}
+        if filters:
+            # ChromaDB expects simple dicts for equality, or $and / $in logic
+            # This handles simple equality for things like network_id, sensitivity_tier, source_type
+            if len(filters) == 1:
+                where_clause = filters
+            else:
+                where_clause = {"$and": [{k: v} for k, v in filters.items()]}
                 
         results = self.collection.query(
             query_embeddings=[query_embedding],
@@ -84,8 +88,7 @@ class VectorStore:
                 "chunk_id": ids[i],
                 "text": docs[i],
                 "metadata": metas[i],
-                "similarity": round(similarity, 4),
-                "distance": round(distances[i], 4)
+                "dense_score": round(similarity, 4)
             })
             
         return retrieved

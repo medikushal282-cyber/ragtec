@@ -8,10 +8,26 @@ from api.routes import router as api_router
 from api.soc_routes import router as soc_router
 from config import settings
 
+from contextlib import asynccontextmanager
+from ingestion.fim.watcher import FIMWatcher
+from api.fim_routes import router as fim_router
+import os
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize real filesystem FIM watcher on a test directory
+    workspace_dir = os.path.abspath(os.path.join(os.getcwd(), "..", "..", "test_monitor"))
+    os.makedirs(workspace_dir, exist_ok=True)
+    watcher = FIMWatcher(workspace_dir)
+    watcher.start()
+    yield
+    watcher.stop()
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="Clean-slate modular implementation of IEEE RAGSec framework",
-    version=settings.APP_VERSION
+    version=settings.APP_VERSION,
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -24,6 +40,7 @@ app.add_middleware(
 
 app.include_router(api_router)
 app.include_router(soc_router)
+app.include_router(fim_router)
 
 @app.get("/")
 def root_status():

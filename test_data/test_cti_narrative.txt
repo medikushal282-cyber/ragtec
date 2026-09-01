@@ -1,0 +1,14 @@
+THREAT REPORT: APT-29 Campaign
+Date: 2026-08-31
+Sensitivity: TLP:AMBER
+
+Executive Summary
+We observed a targeted attack against enterprise host WS-CORP-DESKTOP1. The adversary utilized a known vulnerability, CVE-2023-38831, to execute arbitrary code. 
+
+Technical Details
+Initial access was achieved via spearphishing (T1566.001), delivering a payload matching SHA-256 hash e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.
+An older variant used MD5 hash d41d8cd98f00b204e9800998ecf8427e.
+
+Command and Control
+The payload communicates with a malicious infrastructure located at badguy-command.xyz. We identified the C2 server at IP address 198.51.100.42. 
+Lateral movement (TA0008) was attempted using valid accounts.

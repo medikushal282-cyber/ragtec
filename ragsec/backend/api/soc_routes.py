@@ -8,10 +8,16 @@ from domain.mitigation import mitigation_service
 from domain.ingestion import ingestion_normalizer
 import json
 
+from pathlib import Path
+import os
+import json
+
 router = APIRouter(prefix="/api/soc", tags=["soc_platform"])
 
 # For MVP, we load the synthetic dataset into memory to serve the API
-DATASET_PATH = "data/soc_dataset.json"
+DATASET_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "soc_dataset.json"
+if not DATASET_PATH.exists():
+    DATASET_PATH = Path(__file__).resolve().parent.parent / "data" / "soc_dataset.json"
 
 networks_db = {}
 devices_db = {}
@@ -156,3 +162,36 @@ def investigate_incident_rag(incident_id: str):
 @router.get("/audit", response_model=list)
 def get_audit_trail():
     return mitigation_service.audits
+
+@router.get("/dashboard")
+def get_dashboard_telemetry():
+    from db.database import get_all_records
+    events = get_all_records("events")
+    incidents = pipeline_instance.get_all_incidents()
+    
+    # Process events for FIM vs other
+    fim_events = [e for e in events if e.get("source_type") == "FIM"]
+    other_events = [e for e in events if e.get("source_type") != "FIM"]
+    
+    recent_incidents = [i.model_dump() for i in incidents[:10]] if incidents else []
+    
+    # Count network devices
+    device_count = len(devices_db)
+    
+    # Count critical incidents
+    critical_incidents = [i for i in incidents if i.threat_classification.severity.value == "Critical"]
+    
+    return {
+        "generatedAt": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat(),
+        "simulated": False,
+        "metrics": {
+            "total_events": len(events),
+            "fim_events": len(fim_events),
+            "total_incidents": len(incidents),
+            "device_count": device_count,
+            "critical_incidents": len(critical_incidents)
+        },
+        "incidents": recent_incidents,
+        "fim": fim_events[:10]
+    }
+

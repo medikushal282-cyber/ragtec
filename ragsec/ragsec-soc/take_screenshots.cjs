@@ -7,11 +7,18 @@ const puppeteer = require('puppeteer');
 
   console.log("Navigating to Dashboard...");
   await page.goto('http://localhost:3000/', { waitUntil: 'networkidle0' });
-  await page.screenshot({ path: 'C:\\Users\\medik\\.gemini\\antigravity\\scratch\\AI-BRIDGE-SANDBOX\\screenshots\\soc_dashboard_verified.png' });
+  await page.screenshot({ path: 'C:\\Users\\medik\\.gemini\\antigravity\\brain\\cf396fbc-1d09-4bc2-8e96-b9bf001dd93f\\soc_dashboard_phase1.png' });
 
-  console.log("Navigating to Incidents...");
-  await page.goto('http://localhost:3000/incidents', { waitUntil: 'networkidle0' });
-  await page.screenshot({ path: 'C:\\Users\\medik\\.gemini\\antigravity\\scratch\\AI-BRIDGE-SANDBOX\\screenshots\\soc_incidents_verified.png' });
+  console.log("Clicking FIM Monitor...");
+  await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const fimBtn = buttons.find(b => b.textContent && b.textContent.includes('FIM Monitor'));
+    if (fimBtn) fimBtn.click();
+  });
+  // Wait for React to update
+  await new Promise(r => setTimeout(r, 1000));
+  await page.screenshot({ path: 'C:\\Users\\medik\\.gemini\\antigravity\\brain\\cf396fbc-1d09-4bc2-8e96-b9bf001dd93f\\soc_fim_phase1.png' });
+
 
   await browser.close();
   console.log("Screenshots captured!");

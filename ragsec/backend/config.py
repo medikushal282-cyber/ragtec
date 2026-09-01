@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     EMBEDDING_DIM: int = 384
     
+    # Reranker Model (Configurable)
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    
     # LLM Settings (Local Ollama / Google Gemini fallback)
     LLM_PROVIDER: str = "ollama" # "ollama" | "gemini" | "mock"
     LLM_MODEL: str = "llama3.2"

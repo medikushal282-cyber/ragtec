@@ -1,0 +1,14 @@
+[
+  {
+    "threat_actor": "APT-33",
+    "targets": ["Energy", "Aerospace"],
+    "tools": ["Drop.exe", "Exfil.ps1"],
+    "cve": "CVE-2021-34527"
+  },
+  {
+    "threat_actor": "FIN7",
+    "targets": ["Retail", "Hospitality"],
+    "tools": ["Carbanak", "Griffon"],
+    "ttps": ["T1059", "T1190"]
+  }
+]

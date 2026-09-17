@@ -6,6 +6,8 @@ from domain.soc_models import Network, Device, SecurityEvent, Incident, Mitigati
 from pipeline.event_pipeline import pipeline_instance
 from domain.mitigation import mitigation_service
 from domain.ingestion import ingestion_normalizer
+import db.database as db_module
+from db.database import get_events_by_device, get_events_by_network
 import json
 
 from pathlib import Path
@@ -27,11 +29,18 @@ def load_dataset():
         with open(DATASET_PATH, "r") as f:
             data = json.load(f)
             for n in data.get("networks", []):
-                networks_db[n["id"]] = Network(**n)
+                net = Network(**n)
+                networks_db[n["id"]] = net
+                # Persist to SQLite so the DB reflects the full network topology
+                db_module.save_record('networks', n["id"], n)
             for d in data.get("devices", []):
-                devices_db[d["id"]] = Device(**d)
+                dev = Device(**d)
+                devices_db[d["id"]] = dev
+                # Persist with network_id FK
+                db_module.save_record('devices', d["id"], d, 'network_id', d["network_id"])
             for e in data.get("events", []):
-                # We feed events through the pipeline to populate incidents
+                # Tag seeded events so a future DemoProvider can filter them
+                e["data_source"] = "seeded"
                 pipeline_instance.process_event(SecurityEvent(**e))
     except FileNotFoundError:
         pass
@@ -43,12 +52,28 @@ load_dataset()
 def get_networks():
     return list(networks_db.values())
 
+@router.get("/networks/{network_id}/devices", response_model=List[Device])
+def get_devices_for_network(network_id: str):
+    """Returns all devices belonging to a specific network (Network → Device chain)."""
+    devs = [d for d in devices_db.values() if d.network_id == network_id]
+    if not devs:
+        # Fallback to DB if in-memory cache missed
+        rows = db_module.get_records_by_fk('devices', 'network_id', network_id)
+        devs = [Device(**r) for r in rows]
+    return devs
+
 @router.get("/devices", response_model=List[Device])
 def get_devices(network_id: Optional[str] = None):
     devs = list(devices_db.values())
     if network_id:
         devs = [d for d in devs if d.network_id == network_id]
     return devs
+
+@router.get("/devices/{device_id}/events")
+def get_events_for_device(device_id: str):
+    """Returns all security events attributed to a specific device (Device → Event chain)."""
+    rows = get_events_by_device(device_id)
+    return rows
 
 @router.get("/events", response_model=List[SecurityEvent])
 def get_events():
@@ -91,34 +116,7 @@ class RecommendMitigationReq(BaseModel):
     description: str
     target_device_id: str
 
-@router.post("/incidents/{incident_id}/mitigate", response_model=MitigationAction)
-def recommend_mitigation(incident_id: str, req: RecommendMitigationReq):
-    inc = pipeline_instance.get_incident(incident_id)
-    if not inc:
-        raise HTTPException(status_code=404, detail="Incident not found.")
-    action = mitigation_service.recommend_mitigation(inc, req.action_type, req.description, req.target_device_id)
-    return action
 
-@router.post("/mitigations/{action_id}/approve", response_model=MitigationAction)
-def approve_mitigation(action_id: str, analyst_id: str = "SOC-ANALYST-1"):
-    action = mitigation_service.approve_mitigation(action_id, analyst_id)
-    if not action:
-        raise HTTPException(status_code=400, detail="Cannot approve action.")
-    return action
-
-@router.post("/mitigations/{action_id}/execute", response_model=MitigationAction)
-def execute_mitigation(action_id: str):
-    action = mitigation_service.execute_mitigation(action_id)
-    if not action:
-        raise HTTPException(status_code=400, detail="Cannot execute action.")
-    return action
-
-@router.post("/mitigations/{action_id}/verify", response_model=MitigationAction)
-def verify_mitigation(action_id: str, success: bool, notes: str):
-    action = mitigation_service.verify_mitigation(action_id, success, notes)
-    if not action:
-        raise HTTPException(status_code=400, detail="Cannot verify action.")
-    return action
 
 from api.routes import execute_query
 from models import QueryRequest, IncidentSeverity, SensitivityTier
@@ -159,9 +157,20 @@ def investigate_incident_rag(incident_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/correlations/cross-network")
+def get_cross_network_correlations():
+    from pipeline.event_pipeline import pipeline_instance
+    return [c.model_dump() for c in pipeline_instance.find_cross_network_correlations()]
+
 @router.get("/audit", response_model=list)
 def get_audit_trail():
-    return mitigation_service.audits
+    from domain.audit import audit_service
+    return audit_service.get_audit_trail()
+
+@router.get("/audit/verify")
+def verify_audit_chain():
+    from domain.audit import audit_service
+    return {"status": audit_service.verify_chain()}
 
 @router.get("/dashboard")
 def get_dashboard_telemetry():
@@ -179,7 +188,7 @@ def get_dashboard_telemetry():
     device_count = len(devices_db)
     
     # Count critical incidents
-    critical_incidents = [i for i in incidents if i.threat_classification.severity.value == "Critical"]
+    critical_incidents = [i for i in incidents if str(getattr(i.threat_classification.severity, "value", i.threat_classification.severity) or "").lower() == "critical"]
     
     return {
         "generatedAt": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat(),
@@ -195,3 +204,62 @@ def get_dashboard_telemetry():
         "fim": fim_events[:10]
     }
 
+class MitigationRequest(BaseModel):
+    action_type: str
+    description: str
+    target_device_id: str
+
+class AnalystDecision(BaseModel):
+    analyst_id: str
+
+class VerifyRequest(BaseModel):
+    success: bool
+    notes: str
+
+@router.post("/incidents/{incident_id}/mitigations", response_model=MitigationAction)
+def recommend_mitigation(incident_id: str, req: MitigationRequest):
+    inc = pipeline_instance.get_incident(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    action = mitigation_service.recommend_mitigation(inc, req.action_type, req.description, req.target_device_id)
+    return action
+
+@router.get("/incidents/{incident_id}/mitigations", response_model=List[MitigationAction])
+def get_mitigations_for_incident(incident_id: str):
+    inc = pipeline_instance.get_incident(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return inc.mitigation_actions
+
+@router.post("/mitigations/{action_id}/approve", response_model=MitigationAction)
+def approve_mitigation(action_id: str, req: AnalystDecision):
+    action = mitigation_service.approve_mitigation(action_id, req.analyst_id)
+    if not action:
+        raise HTTPException(status_code=400, detail="Invalid action or not in pending state")
+    return action
+
+@router.post("/mitigations/{action_id}/reject", response_model=MitigationAction)
+def reject_mitigation(action_id: str, req: AnalystDecision):
+    action = mitigation_service.reject_mitigation(action_id, req.analyst_id)
+    if not action:
+        raise HTTPException(status_code=400, detail="Invalid action or not in pending state")
+    return action
+
+@router.post("/mitigations/{action_id}/execute", response_model=MitigationAction)
+def execute_mitigation(action_id: str):
+    action = mitigation_service.execute_mitigation(action_id)
+    if not action:
+        raise HTTPException(status_code=400, detail="Invalid action or not approved")
+    return action
+
+@router.post("/mitigations/{action_id}/verify", response_model=MitigationAction)
+def verify_mitigation(action_id: str, req: VerifyRequest):
+    action = mitigation_service.verify_mitigation(action_id, req.success, req.notes)
+    if not action:
+        raise HTTPException(status_code=400, detail="Invalid action or not executed")
+    return action
+
+@router.get("/mitigations/history", response_model=List[MitigationAction])
+def get_mitigation_history():
+    rows = db_module.get_all_records("mitigations")
+    return [MitigationAction(**row) for row in rows]

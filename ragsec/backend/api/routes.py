@@ -53,6 +53,7 @@ def _run_crc_verification(answer: str, evidence_models: List[Evidence], severity
         v_result, resp_status = verify_response(answer, evidence_models, severity)
         return {
             "citation_check": v_result.status,  # VERIFIED / PARTIAL / UNSUPPORTED
+            "valid_citations": [c.model_dump() for c in v_result.valid_citations],
             "verified_citations": v_result.verified_citations,
             "unsupported_citations": v_result.unsupported_citations,
             "verified_entities": v_result.verified_entities,
@@ -127,6 +128,9 @@ def ingest_document(payload: IngestDocPayload):
         embeddings = embedder.embed_texts(texts)
         vector_store.upsert_chunks(chunks, embeddings)
 
+    from domain.audit import audit_service
+    audit_service.log_event("SYSTEM", "INGEST_KNOWLEDGE", payload.source_name, f"Ingested {len(chunks)} chunks")
+
     return {
         "status": "ingested",
         "document_id": doc.document_id,
@@ -183,34 +187,46 @@ def execute_query(req: QueryRequest):
     6. Return answer + evidence + governance state
     """
     # --- Step 1: Retrieve ---
+    from domain.audit import audit_service
     evidence_dicts = retriever.retrieve(query=req.query, top_n=5)
     evidence_models = _dicts_to_evidence(evidence_dicts)
     cross_encoder_active = retriever.reranker.model is not None
 
     # --- Step 2: Evidence Gating ---
     policy = _run_evidence_gating(evidence_models, req.severity)
+    is_sufficient = policy.get("passed", True)
 
-    if not policy.get("passed", True):
-        # ABSTAIN: insufficient evidence, but generate a conversational response
-        reason = policy.get("reason", "Evidence insufficient.")
-        refusal_prompt = (
-            f"You are the RAGSec SOC AI. A user queried: '{req.query}'. "
-            "Output a single, cold, analytical sentence rejecting the query. "
-            "State that the query was aborted because it failed the evidence sufficiency threshold in the RAG pipeline. "
-            "Do NOT apologize. Do NOT introduce yourself. Do NOT offer generic advice."
-        )
-        result = generator.generate(refusal_prompt)
-        answer = result.get("answer", f"ABSTAINED: {reason}")
-        
+    # If absolutely zero evidence was found at all or gating failed
+    if not evidence_dicts or len(evidence_dicts) == 0:
+        audit_service.log_event("SYSTEM", "RAG_ABSTAIN", req.query, "Zero evidence chunks retrieved")
         return {
-            "query_id": "Q-ABSTAINED",
-            "answer": answer,
+            "query_id": "Q-NO-EVIDENCE",
+            "answer": "ABSTAINED: " + policy.get("reason", "I searched the ingested CTI corpus and telemetry logs, but no correlated security records or indicators were found matching your query."),
+            "evidence": [],
+            "confidence_score": 0.0,
+            "status": "ABSTAINED",
+            "governance": {
+                "gating": "BLOCKED",
+                "gating_reason": "Zero evidence chunks retrieved for query",
+                "pii_masked": False,
+                "cross_encoder_active": cross_encoder_active,
+                "citation_check": "N/A",
+                "crc_passed": False,
+                "identity_verified": True,
+            }
+        }
+
+    if not is_sufficient:
+        audit_service.log_event("SYSTEM", "RAG_ABSTAIN", req.query, "Evidence insufficient")
+        return {
+            "query_id": f"Q-{hash(req.query) % 100000:05d}",
+            "answer": "ABSTAINED: " + policy.get("reason", "Insufficient evidence to support a reliable conclusion."),
             "evidence": evidence_dicts,
             "confidence_score": policy.get("confidence", 0.0),
             "status": "ABSTAINED",
             "governance": {
                 "gating": "BLOCKED",
-                "gating_reason": policy.get("reason"),
+                "gating_reason": policy.get("reason", "Evidence did not meet sufficiency thresholds"),
                 "pii_masked": False,
                 "cross_encoder_active": cross_encoder_active,
                 "citation_check": "N/A",
@@ -220,18 +236,14 @@ def execute_query(req: QueryRequest):
         }
 
     # --- Step 3: Build Grounded Prompt (PII masking happens here) ---
-    prompt, masked_evidence = build_grounded_prompt(req.query, evidence_dicts)
+    surviving = policy.get("surviving_evidence", evidence_models)
+    surviving_dicts = [e.model_dump() for e in surviving]
+    prompt, masked_evidence = build_grounded_prompt(req.query, surviving_dicts)
 
     # --- Step 4: Generate via Ollama ---
     result = generator.generate(prompt)
     answer = result.get("answer", "")
     provider = result.get("provider", "unknown")
-
-    # --- Step 5: CRC Verification ---
-    crc = _run_crc_verification(answer, evidence_models, req.severity)
-
-    # Determine final status
-    final_status = crc.get("response_status", "ANSWERED")
 
     # Real confidence from governance module
     try:
@@ -239,10 +251,48 @@ def execute_query(req: QueryRequest):
     except Exception:
         confidence = policy.get("confidence", 0.5)
 
+    if result.get("error"):
+        return {
+            "query_id": f"Q-{hash(req.query) % 100000:05d}",
+            "answer": answer,
+            "evidence": masked_evidence,
+            "citations": [],
+            "confidence_score": round(confidence, 4),
+            "status": "ERROR",
+            "provider": provider,
+            "governance": {
+                "gating": "PASSED",
+                "gating_reason": None,
+                "pii_masked": True,
+                "cross_encoder_active": cross_encoder_active,
+                "citation_check": "ERROR",
+                "crc_passed": False,
+                "verified_citations": [],
+                "unsupported_citations": [],
+                "unsupported_entities": [],
+                "warnings": ["LLM generation failed"],
+                "identity_verified": True,
+            }
+        }
+
+    # --- Step 5: CRC Verification ---
+    crc = _run_crc_verification(answer, evidence_models, req.severity)
+
+    # Determine final status
+    final_status = crc.get("response_status", "ANSWERED")
+
+    audit_service.log_event(
+        "SYSTEM", 
+        "RAG_QUERY", 
+        req.query, 
+        f"Answered with {len(crc.get('valid_citations', []))} citations"
+    )
+
     return {
         "query_id": f"Q-{hash(req.query) % 100000:05d}",
         "answer": answer,
         "evidence": masked_evidence,
+        "citations": crc.get("valid_citations", []),
         "confidence_score": round(confidence, 4),
         "status": final_status,
         "provider": provider,

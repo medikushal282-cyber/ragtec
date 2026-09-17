@@ -129,6 +129,7 @@ def verify_response(
     v_result = VerificationResult(
         passed=(v_status != "UNSUPPORTED"),
         status=v_status,
+        valid_citations=citations,
         verified_citations=verified_tags,
         unsupported_citations=unsupported_tags,
         verified_entities=verified_entities,

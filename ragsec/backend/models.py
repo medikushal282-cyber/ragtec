@@ -81,6 +81,7 @@ class CitationInfo(BaseModel):
 class VerificationResult(BaseModel):
     passed: bool
     status: str # "VERIFIED", "PARTIAL", "UNSUPPORTED"
+    valid_citations: List[CitationInfo] = Field(default_factory=list)
     verified_citations: List[str] = Field(default_factory=list)
     unsupported_citations: List[str] = Field(default_factory=list)
     verified_entities: List[Dict[str, Any]] = Field(default_factory=list)

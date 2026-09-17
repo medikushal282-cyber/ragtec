@@ -206,27 +206,60 @@ export default function ActiveIncident() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, typing])
 
-  const sendMessage = () => {
-    if (!input.trim()) return
+  const sendMessage = async () => {
+    const userQuery = input.trim()
+    if (!userQuery) return
     setMessages((prev) => [...prev, {
       id: Math.random().toString(36).slice(2),
       role: "analyst",
-      content: input,
+      content: userQuery,
       ts: new Date().toLocaleTimeString("en-US", { hour12: false }),
     }])
     setInput("")
     setTyping(true)
-    setTimeout(() => {
+
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: userQuery,
+          severity: "high",
+          allowed_tiers: ["public", "internal", "restricted"]
+        })
+      })
+      const data = await res.json()
+      setTyping(false)
+
+      const citations: Citation[] = (data.evidence || []).map((e: any, idx: number) => ({
+        id: e.citation_tag || `c${idx + 1}`,
+        uuid: e.chunk_id || Math.random().toString(36).slice(2),
+        source: e.source_name || e.source || "Retrieved CTI Evidence",
+        type: "ThreatReport",
+        excerpt: e.masked_text || e.chunk_text || "",
+        relevance: e.similarity_score || e.rerank_score || 0.85
+      }))
+
+      setMessages((prev) => [...prev, {
+        id: data.query_id || Math.random().toString(36).slice(2),
+        role: "ragsec",
+        content: data.answer || "No response received from RAGSec engine.",
+        citations: citations.length > 0 ? citations : undefined,
+        confidence: data.confidence_score ?? 0.85,
+        severity: data.status === "ABSTAINED" ? "P3" : "P1",
+        ts: new Date().toLocaleTimeString("en-US", { hour12: false }),
+      }])
+    } catch (err) {
       setTyping(false)
       setMessages((prev) => [...prev, {
         id: Math.random().toString(36).slice(2),
         role: "ragsec",
-        content: "⊘ *Abstention notice:* Insufficient evidence in retrieved corpus to answer this query with confidence above the P1 threshold (θ_sim required: 0.95). Please provide additional context or escalate to human incident commander for manual investigation.\n\nAvailable evidence sources: [cite:a3f2-b891] [cite:f7a1-e823-9b34-0c12]",
+        content: "⊘ *Abstention notice:* Insufficient evidence in retrieved corpus or backend offline to answer this query with confidence above threshold.",
         citations: [CITATIONS[0], CITATIONS[1]],
         confidence: 0.61,
         ts: new Date().toLocaleTimeString("en-US", { hour12: false }),
       }])
-    }, 2500)
+    }
   }
 
   return (

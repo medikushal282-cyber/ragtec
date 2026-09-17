@@ -4,7 +4,8 @@ import uuid
 import datetime
 import json
 from domain.soc_models import SecurityEvent, ProvenanceMetadata, CanonicalFields, Incident, IncidentStatus, ThreatClassification, ThreatCategory, ClassificationState, MitigationAction, MitigationStatus
-from db.database import save_record, get_all_records
+from db.database import save_record, get_all_records, get_record
+from domain.audit import audit_service
 from pipeline.threat_analyzer import threat_analyzer, safe_read_snippet
 
 def get_file_hash(filepath: str) -> str:
@@ -101,17 +102,15 @@ def generate_fim_event(filepath: str, action: str, file_hash: str = '') -> Secur
             events=[event]
         )
         save_record('incidents', inc_id, inc.model_dump())
+        audit_service.log_event("SYSTEM", "CREATE_INCIDENT", inc_id, f"Created incident for {cls_name}")
 
     # Log to audit_logs
-    audit_id = f"AUD-{uuid.uuid4().hex[:6].upper()}"
-    audit_data = {
-        'id': audit_id,
-        'actor': 'FIM_AGENT',
-        'action': f"FILE_{action.upper()}",
-        'target': filepath,
-        'timestamp': datetime.datetime.now(datetime.UTC).isoformat()
-    }
-    save_record('audit_logs', audit_id, audit_data)
+    audit_service.log_event(
+        actor="FIM_AGENT",
+        action=f"FILE_{action.upper()}",
+        target=filepath,
+        result="Generated event"
+    )
 
     return event
 
@@ -119,15 +118,36 @@ def scan_workspace(directory: str):
     print(f'Scanning workspace: {directory}')
     scanned_count = 0
     threats_count = 0
+    
+    existing_events = get_all_records('events')
+    existing_map = {}
+    for e in existing_events:
+        if isinstance(e, dict):
+            c = e.get('canonical') or {}
+            fp = c.get('file_path', '').lower()
+            h = c.get('file_hash_sha256', '')
+            if fp:
+                existing_map[fp] = (e.get('id'), h, e.get('status'))
+
     for root, dirs, files in os.walk(directory):
-        if '.git' in root or 'node_modules' in root or '__pycache__' in root or '.gemini' in root or '.quarantine' in root:
+        if '.git' in root or 'node_modules' in root or '__pycache__' in root or '.gemini' in root or '.quarantine' in root or 'quarantine' in root:
             continue
         for file in files:
+            if file.startswith('.') or file.startswith('~') or file.endswith('.tmp') or file == 'desktop.ini':
+                continue
             filepath = os.path.join(root, file)
             file_hash = get_file_hash(filepath)
+            
+            # Check if this exact file with same hash is already recorded
+            prev = existing_map.get(filepath.lower())
+            if prev and prev[1] == file_hash and prev[2] != "QUARANTINED":
+                scanned_count += 1
+                continue
+
             evt = generate_fim_event(filepath, 'scan', file_hash)
             scanned_count += 1
             if evt.is_suspicious:
                 threats_count += 1
+
     print(f'Scan complete: {scanned_count} files scanned, {threats_count} threats flagged.')
     return {'files_scanned': scanned_count, 'threats_flagged': threats_count}

@@ -78,7 +78,12 @@ export const appRouter = router({
         const res = await fetch("http://localhost:8000/api/fim/quarantine", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input)
+          body: JSON.stringify({
+            file_path: input.filePath,
+            filePath: input.filePath,
+            event_id: input.eventId,
+            eventId: input.eventId
+          })
         });
         if (res.ok) {
           const data = await res.json();
@@ -96,7 +101,12 @@ export const appRouter = router({
         const res = await fetch("http://localhost:8000/api/fim/restore", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input)
+          body: JSON.stringify({
+            quarantine_path: input.quarantinePath,
+            quarantinePath: input.quarantinePath,
+            original_path: input.originalPath,
+            originalPath: input.originalPath
+          })
         });
         if (res.ok) {
           const data = await res.json();
@@ -111,6 +121,35 @@ export const appRouter = router({
     listQuarantined: publicProcedure.query(async () => {
       try {
         const res = await fetch("http://localhost:8000/api/fim/quarantined");
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      return [];
+    }),
+    ignoreFile: publicProcedure.input(z.object({
+      filePath: z.string().optional(),
+      eventId: z.string().optional(),
+      duration: z.string().default("permanent"),
+      reason: z.string().optional()
+    })).mutation(async ({ input, ctx }) => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/ignore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          await appendAudit(ctx.user?.id || "ANALYST", `IGNORE_${input.duration.toUpperCase()}`, input.filePath || input.eventId || "unknown", data.status);
+          return data;
+        }
+        return { status: "ERROR" };
+      } catch (e: any) {
+        return { status: "ERROR", detail: e.message };
+      }
+    }),
+    listWhitelist: publicProcedure.query(async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/whitelist");
         if (res.ok) return await res.json();
       } catch (e) {}
       return [];

@@ -22,22 +22,17 @@ def evaluate_evidence_policy(
     severity: IncidentSeverity = IncidentSeverity.LOW,
     min_distinct_sources: int = settings.MIN_SOURCE_DIVERSITY
 ) -> Dict[str, Any]:
-    """
-    Applies multi-stage severity governance check:
-    1. Check for empty evidence
-    2. Check top candidate meets severity similarity threshold
-    3. Check aggregate confidence meets severity confidence threshold
-    4. Check source diversity constraint
-    """
     thresholds = get_policy_thresholds(severity)
     theta_sim = thresholds["similarity"]
     theta_conf = thresholds["confidence"]
+    # Separate threshold for cross-encoder (logits typically range from -10 to 10; >0 is usually positive relevance)
+    theta_rerank = 0.0 if severity == IncidentSeverity.LOW else 1.0 if severity == IncidentSeverity.MEDIUM else 2.0 if severity == IncidentSeverity.HIGH else 3.0
     
     if not evidence:
         return {
             "passed": False,
             "status": "ABSTAINED",
-            "reason": f"No candidate evidence chunks found for incident query (Severity: {severity.value.upper()}).",
+            "reason": f"No candidate evidence chunks found for incident query.",
             "confidence": 0.0,
             "surviving_evidence": [],
             "retrieval_summary": RetrievalSummary(
@@ -52,9 +47,19 @@ def evaluate_evidence_policy(
         
     confidence = calculate_retrieval_confidence(evidence)
     
-    # Filter surviving chunks that meet theta_sim
-    surviving = [e for e in evidence if e.adjusted_similarity >= theta_sim]
-    
+    # Filter by dense similarity AND rerank score (if reranker was used, they differ)
+    surviving = []
+    for e in evidence:
+        is_dense_ok = e.similarity_score >= theta_sim
+        is_rerank_ok = True
+        # If reranker was used, adjusted_similarity contains the logit, which is usually > 0 for relevance.
+        # If it equals similarity_score exactly, reranker was not used or it was mocked.
+        if e.adjusted_similarity != e.similarity_score:
+            is_rerank_ok = e.adjusted_similarity >= theta_rerank
+            
+        if is_dense_ok and is_rerank_ok:
+            surviving.append(e)
+            
     distinct_docs = set(e.document_id for e in surviving)
     source_count = len(distinct_docs)
     
@@ -71,7 +76,7 @@ def evaluate_evidence_policy(
         return {
             "passed": False,
             "status": "ABSTAINED",
-            "reason": f"Top evidence similarity ({evidence[0].adjusted_similarity:.2f}) failed {severity.value.upper()} similarity threshold ({theta_sim:.2f}).",
+            "reason": f"Evidence failed severity thresholds (Sim >= {theta_sim:.2f}, Rerank >= {theta_rerank:.2f}).",
             "confidence": confidence,
             "surviving_evidence": [],
             "retrieval_summary": retrieval_summary
@@ -87,7 +92,6 @@ def evaluate_evidence_policy(
             "retrieval_summary": retrieval_summary
         }
         
-    # Check source diversity if multiple chunks returned
     if len(surviving) >= min_distinct_sources and source_count < min_distinct_sources:
         return {
             "passed": False,
@@ -102,7 +106,7 @@ def evaluate_evidence_policy(
     return {
         "passed": True,
         "status": "SUFFICIENT",
-        "reason": None,
+        "reason": f"Found {len(surviving)} strongly relevant chunks from {source_count} sources.",
         "confidence": confidence,
         "surviving_evidence": surviving,
         "retrieval_summary": retrieval_summary

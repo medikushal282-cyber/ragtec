@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from domain.soc_models import MitigationAction, MitigationStatus, Incident, IncidentStatus, AuditEvent
 from pipeline.event_pipeline import pipeline_instance
 import db.database as db
+from domain.audit import audit_service
 
 class MitigationLifecycle:
     def __init__(self):
@@ -10,15 +11,7 @@ class MitigationLifecycle:
         pass
         
     def add_audit(self, actor: str, action: str, target: str, result: str, evidence_ref: str = None):
-        audit = AuditEvent(
-            id=f"AUD-{uuid.uuid4().hex[:6].upper()}",
-            actor=actor,
-            action=action,
-            target=target,
-            result=result,
-            evidence_ref=evidence_ref
-        )
-        db.save_record('audit_logs', audit.id, audit.model_dump())
+        audit_service.log_event(actor, action, target, result, evidence_ref)
 
     def recommend_mitigation(self, incident: Incident, action_type: str, description: str, target_device_id: str) -> MitigationAction:
         action = MitigationAction(
@@ -67,6 +60,25 @@ class MitigationLifecycle:
             return action
         return None
 
+    def reject_mitigation(self, action_id: str, analyst_id: str) -> Optional[MitigationAction]:
+        action = self.get_mitigation(action_id)
+        if action and action.status in [MitigationStatus.RECOMMENDED, MitigationStatus.AWAITING_APPROVAL]:
+            action.status = MitigationStatus.REJECTED
+            action.approved_by = analyst_id
+            
+            db.save_record('mitigations', action.id, action.model_dump(), 'incident_id', action.incident_id)
+            
+            incident = pipeline_instance.get_incident(action.incident_id)
+            if incident:
+                for m in incident.mitigation_actions:
+                    if m.id == action.id:
+                        m.status = action.status
+                        m.approved_by = action.approved_by
+                pipeline_instance.update_incident(incident)
+                
+            self.add_audit(analyst_id, "REJECT_MITIGATION", action.id, "Rejected")
+            return action
+        return None
     def execute_mitigation(self, action_id: str) -> Optional[MitigationAction]:
         action = self.get_mitigation(action_id)
         if action and action.status == MitigationStatus.APPROVED:

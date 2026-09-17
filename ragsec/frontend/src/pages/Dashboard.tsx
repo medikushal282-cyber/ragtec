@@ -159,16 +159,22 @@ function SPSGauge() {
 
 export default function Dashboard() {
   const [actionIdx, setActionIdx] = useState(0)
-  const [apiStatus, setApiStatus] = useState<string>("CONNECTING...");
+  const [metricsData, setMetricsData] = useState(METRICS)
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/health")
+    fetch("http://127.0.0.1:8000/api/soc/dashboard")
       .then(res => res.json())
       .then(data => {
-        if (data.status === "healthy") {
-          setApiStatus("API ONLINE");
-        } else {
-          setApiStatus("API ERROR");
+        setApiStatus("API ONLINE");
+        if (data.metrics) {
+          setMetricsData([
+            { label: "Active Incidents", value: String(data.metrics.total_incidents || 2), sub: `Critical: ${data.metrics.critical_incidents || 1}`, color: "#ef4444", icon: "⚠" },
+            { label: "Total Events", value: String(data.metrics.total_events || 47), sub: `FIM: ${data.metrics.fim_events || 12}`, color: "#f59e0b", icon: "🛡" },
+            { label: "Indexed Chunks", value: "16", sub: "Corpus Active", color: "#00d4ff", icon: "📚" },
+            { label: "Device Count", value: String(data.metrics.device_count || 10), sub: "Monitored Hosts", color: "#10b981", icon: "⚡" },
+            { label: "Abstentions (24h)", value: "8", sub: "threshold enforced", color: "#8b5cf6", icon: "⊘" },
+            { label: "SPS Score", value: "2.711", sub: "↑ baseline 1.275", color: "#00d4ff", icon: "★" },
+          ])
         }
       })
       .catch(() => setApiStatus("API OFFLINE"));
@@ -202,7 +208,7 @@ export default function Dashboard() {
       
       {/* Metric Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
-        {METRICS.map((m) => (
+        {metricsData.map((m) => (
           <div key={m.label} style={{
             background: "#0d1629",
             border: "1px solid #1a2d4f",

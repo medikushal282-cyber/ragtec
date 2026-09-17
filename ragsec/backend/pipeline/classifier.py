@@ -6,7 +6,7 @@ class RuleBasedClassifier:
     def __init__(self):
         self.rules = [
             (ThreatCategory.PHISHING, [r"suspicious link", r"phishing", r"credential harvest", r"oauth spoof", r"downloadstring.*http"]),
-            (ThreatCategory.RANSOMWARE, [r"encryption of", r"shadow cop(?:y|ies) deleted", r"vssadmin", r"ransom note", r"\.crypted"]),
+            (ThreatCategory.RANSOMWARE, [r"encryption of", r"mass file encryption", r"shadow cop(?:y|ies) deleted", r"vssadmin", r"ransom note", r"\.crypted"]),
             (ThreatCategory.SPYWARE, [r"keylogger", r"key_hook", r"unauthorized audio", r"screen capture", r"mic access"]),
             (ThreatCategory.TROJAN, [r"masquerading", r"backdoor", r"svchost\.exe spawned cmd\.exe"]),
             (ThreatCategory.BRUTE_FORCE, [r"failed login attempts", r"logon bursts", r"kerberoasting", r"brute[- ]force"]),
@@ -14,7 +14,7 @@ class RuleBasedClassifier:
             (ThreatCategory.DATA_EXFILTRATION, [r"gb of.*transferred", r"dns tunneling", r"exfiltration", r"high volume egress"]),
             (ThreatCategory.C2, [r"beaconing", r"periodic dns", r"c2-tracker", r"command and control"]),
             (ThreatCategory.INSIDER_THREAT, [r"accessed all.*3:00 am", r"off-hours bulk access", r"privilege misuse"]),
-            (ThreatCategory.MALWARE, [r"cobalt strike", r"executable drops", r"malware detected", r"signature match"])
+            (ThreatCategory.MALWARE, [r"cobalt strike", r"executable drops", r"malware detected", r"signature match", r"process spawning"])
         ]
 
     def classify_event(self, raw_message: str, is_suspicious: bool) -> ThreatClassification:

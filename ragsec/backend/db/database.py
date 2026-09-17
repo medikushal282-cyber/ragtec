@@ -26,10 +26,32 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS networks (id TEXT PRIMARY KEY, data JSON)''')
     c.execute('''CREATE TABLE IF NOT EXISTS devices (id TEXT PRIMARY KEY, network_id TEXT, data JSON)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, network_id TEXT, data JSON)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        network_id TEXT,
+        device_id TEXT,
+        data_source TEXT DEFAULT 'live',
+        data JSON
+    )''')
+    # Index for fast Network->Device->Event chain queries
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_events_network ON events(network_id)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_events_device ON events(device_id)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_devices_network ON devices(network_id)''')
     c.execute('''CREATE TABLE IF NOT EXISTS incidents (id TEXT PRIMARY KEY, network_id TEXT, data JSON)''')
     c.execute('''CREATE TABLE IF NOT EXISTS mitigations (id TEXT PRIMARY KEY, incident_id TEXT, data JSON)''')
     c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, data JSON)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS whitelist (id TEXT PRIMARY KEY, data JSON)''')
+
+    # Batch 3: File threat analysis results
+    c.execute('''CREATE TABLE IF NOT EXISTS file_analyses (
+        id TEXT PRIMARY KEY,
+        sha256 TEXT,
+        classification TEXT,
+        data_source TEXT DEFAULT 'live',
+        data JSON,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_analyses_sha256 ON file_analyses(sha256)''')
     
     # Phase 2: Relational Knowledge Base
     c.execute('''CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, source_name TEXT, mime_type TEXT, chunk_count INTEGER, status TEXT, data JSON, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
@@ -44,8 +66,17 @@ def save_record(table: str, id_val: str, data: dict, foreign_key_col: str = None
     conn = get_connection()
     c = conn.cursor()
     json_data = json.dumps(data)
-    
-    if foreign_key_col and foreign_key_val:
+
+    # For events table, also persist device_id and data_source as indexed columns
+    if table == 'events':
+        device_id = data.get('device_id', '')
+        data_source = data.get('data_source', 'live')
+        network_id = data.get('network_id', foreign_key_val or '')
+        c.execute('''
+            INSERT OR REPLACE INTO events (id, network_id, device_id, data_source, data)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (id_val, network_id, device_id, data_source, json_data))
+    elif foreign_key_col and foreign_key_val:
         c.execute(f'''
             INSERT OR REPLACE INTO {table} (id, {foreign_key_col}, data)
             VALUES (?, ?, ?)
@@ -80,6 +111,24 @@ def get_records_by_fk(table: str, fk_col: str, fk_val: str) -> List[dict]:
     conn = get_connection()
     c = conn.cursor()
     c.execute(f'SELECT data FROM {table} WHERE {fk_col} = ?', (fk_val,))
+    rows = c.fetchall()
+    conn.close()
+    return [json.loads(row['data']) for row in rows]
+
+def get_events_by_device(device_id: str) -> List[dict]:
+    """Fetch all events attributed to a specific device — uses the indexed device_id column."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT data FROM events WHERE device_id = ? ORDER BY rowid DESC', (device_id,))
+    rows = c.fetchall()
+    conn.close()
+    return [json.loads(row['data']) for row in rows]
+
+def get_events_by_network(network_id: str) -> List[dict]:
+    """Fetch all events attributed to a specific network — uses the indexed network_id column."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT data FROM events WHERE network_id = ? ORDER BY rowid DESC', (network_id,))
     rows = c.fetchall()
     conn.close()
     return [json.loads(row['data']) for row in rows]
@@ -133,3 +182,32 @@ def get_knowledge_sources():
         
     conn.close()
     return docs
+
+def save_file_analysis(result_dict: dict) -> None:
+    """Persist a FileAnalysisResult (as dict) to the file_analyses table."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        'INSERT OR REPLACE INTO file_analyses (id, sha256, classification, data_source, data) VALUES (?, ?, ?, ?, ?)',
+        (result_dict['analysis_id'], result_dict['sha256'],
+         result_dict['classification'], result_dict.get('data_source', 'live'),
+         json.dumps(result_dict))
+    )
+    conn.commit()
+    conn.close()
+
+def get_file_analysis(analysis_id: str) -> Optional[dict]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT data FROM file_analyses WHERE id = ?', (analysis_id,))
+    row = c.fetchone()
+    conn.close()
+    return json.loads(row['data']) if row else None
+
+def list_file_analyses(limit: int = 50) -> List[dict]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT data FROM file_analyses ORDER BY created_at DESC LIMIT ?', (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return [json.loads(r['data']) for r in rows]

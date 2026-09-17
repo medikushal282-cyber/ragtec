@@ -1,4 +1,4 @@
-﻿import re
+import re
 import os
 from typing import Dict, Any, List, Optional
 from domain.soc_models import ThreatCategory, ClassificationState, ThreatClassification
@@ -21,12 +21,13 @@ DANGEROUS_EXTENSIONS = {
 }
 
 SIGNATURE_PATTERNS = [
-    (r'ransom|readme_decrypt|how_to_decrypt|your_files_are_encrypted', ThreatCategory.RANSOMWARE, 'critical', 'Ransomware extortion note or indicator'),
+    (r'malware|virus|trojan|backdoor|exploit|payload|stealer|keylogger|rootkit|webshell|evil', ThreatCategory.MALWARE, 'high', 'Explicit malware/exploit keyword in filename or payload'),
+    (r'ransom|readme_decrypt|how_to_decrypt|your_files_are_encrypted|\.locked|\.crypted', ThreatCategory.RANSOMWARE, 'critical', 'Ransomware extortion note or encrypted extension'),
     (r'vssadmin.*delete.*shadows|wmic.*shadowcopy.*delete', ThreatCategory.RANSOMWARE, 'critical', 'Shadow copy deletion command (Ransomware precursor)'),
     (r'downloadstring|invoke-webrequest|curl.*http|wget.*http', ThreatCategory.PHISHING, 'high', 'Remote payload download cradle'),
     (r'iex\s*\(|invoke-expression|powershell.*-enc|encodedcommand', ThreatCategory.TROJAN, 'high', 'PowerShell memory execution / Obfuscated execution cradle'),
     (r'mimikatz|sekurlsa|lsass|procdump', ThreatCategory.BRUTE_FORCE, 'critical', 'Credential dumping / LSASS memory access artifact'),
-    (r'eval\s*\(\s*\|shell_exec|system\s*\(|passthru', ThreatCategory.MALWARE, 'high', 'Web shell backdoor execution function'),
+    (r'eval\s*\(\s*|shell_exec|system\s*\(|passthru', ThreatCategory.MALWARE, 'high', 'Web shell backdoor execution function'),
     (r'beacon_interval|c2-tracker|badguy-command|\/bin\/bash\s*-i', ThreatCategory.C2, 'critical', 'Command & Control beaconing or interactive reverse shell'),
     (r'security\.evtx|security\.log', ThreatCategory.INSIDER_THREAT, 'high', 'Security event log tampering or clearing')
 ]

@@ -59,8 +59,12 @@ class Device(BaseModel):
     hostname: str
     ip_address: str
     device_type: str
+    os: Optional[str] = None          # e.g. "Windows Server 2022", "Linux 6.1"
+    segment: Optional[str] = None     # e.g. "DMZ", "LAN", "OT"
     criticality: str
     status: str
+    last_seen: Optional[str] = None   # ISO-8601 timestamp
+    risk_score: Optional[int] = None  # 0-100
 
 class ProvenanceMetadata(BaseModel):
     source_id: str
@@ -89,13 +93,17 @@ class SecurityEvent(BaseModel):
     source_type: str
     event_type: str
     raw_message: str
-    
-    # Phase 1 additions:
+
+    # Provenance & normalization
     provenance: Optional[ProvenanceMetadata] = None
     canonical: Optional[CanonicalFields] = None
-    
+
     extracted_entities: Dict[str, List[str]] = Field(default_factory=dict)
     is_suspicious: Optional[bool] = None
+
+    # Data-source discriminator: 'live' | 'seeded' | 'demo'
+    # Allows future centralized DemoProvider to filter without touching the real pipeline.
+    data_source: str = "live"
 
 class ThreatClassification(BaseModel):
     state: ClassificationState
@@ -136,3 +144,19 @@ class AuditEvent(BaseModel):
     target: str
     result: str
     evidence_ref: Optional[str] = None
+    previous_hash: Optional[str] = None
+    current_hash: Optional[str] = None
+
+class CrossNetworkCorrelation(BaseModel):
+    id: str
+    network_a: str
+    network_b: str
+    indicator_type: str
+    indicator_value: str
+    reason: str
+    event_a_id: str
+    event_b_id: str
+    device_a_id: str
+    device_b_id: str
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+

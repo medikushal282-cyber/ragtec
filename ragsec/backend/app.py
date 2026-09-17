@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router as api_router
 from api.soc_routes import router as soc_router
+from api.analysis_routes import router as analysis_router
 from config import settings
 
 from contextlib import asynccontextmanager
@@ -42,6 +43,7 @@ app.add_middleware(
 app.include_router(api_router)
 app.include_router(soc_router)
 app.include_router(fim_router)
+app.include_router(analysis_router)
 
 @app.get("/")
 def root_status():

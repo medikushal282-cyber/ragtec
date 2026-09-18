@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { Page } from "./types";
+import { Page, P8TestReport } from "./types";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import Dashboard from "./pages/Dashboard";
+import AutonomousTester from "./pages/AutonomousTester";
+import TestReports from "./pages/TestReports";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import FleetManagement from "./pages/FleetManagement";
 import ActiveIncident from "./pages/ActiveIncident";
@@ -10,6 +12,10 @@ import MitigationCenter from "./pages/MitigationCenter";
 
 export function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+
+  const handleTestCompleted = (report: P8TestReport) => {
+    setCurrentPage("test_reports");
+  };
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#060911] text-slate-100 font-sans select-none">
@@ -28,6 +34,10 @@ export function App() {
             {currentPage === "dashboard" && (
               <Dashboard onNavigatePage={(page) => setCurrentPage(page)} />
             )}
+            {currentPage === "autonomous_tester" && (
+              <AutonomousTester onRunCompleted={handleTestCompleted} />
+            )}
+            {currentPage === "test_reports" && <TestReports />}
             {currentPage === "knowledge" && <KnowledgeBase />}
             {currentPage === "fleet" && <FleetManagement />}
             {currentPage === "incident" && <ActiveIncident />}

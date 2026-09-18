@@ -2,6 +2,8 @@ import React from "react";
 import { Page } from "../types";
 import { 
   LayoutDashboard, 
+  Bot,
+  ClipboardCheck,
   BrainCircuit, 
   ShieldAlert, 
   AlertTriangle, 
@@ -25,6 +27,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) =
       badge: "LIVE"
     },
     {
+      id: "autonomous_tester" as Page,
+      label: "Autonomous Tester",
+      icon: Bot,
+      badge: "P8"
+    },
+    {
+      id: "test_reports" as Page,
+      label: "Test Reports & Audit",
+      icon: ClipboardCheck,
+      badge: "REPORTS"
+    },
+    {
       id: "knowledge" as Page,
       label: "Threat Intelligence",
       icon: BrainCircuit,
@@ -40,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) =
       id: "incident" as Page,
       label: "Incident Triage",
       icon: AlertTriangle,
-      badge: "3 ALERT"
+      badge: "ALERT"
     },
     {
       id: "mitigation" as Page,
@@ -64,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) =
               v1.0
             </span>
           </div>
-          <p className="text-xs text-slate-400">IEEE Threat Core</p>
+          <p className="text-xs text-slate-400">IEEE Threat & P8 Platform</p>
         </div>
       </div>
 
@@ -75,10 +89,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) =
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs font-semibold text-cyan-300 flex items-center justify-between">
-            <span>FIM Engine</span>
-            <span className="text-[10px] text-emerald-400">NORMAL</span>
+            <span>P8 Engine</span>
+            <span className="text-[10px] text-emerald-400">READY</span>
           </div>
-          <p className="text-[11px] text-slate-400 truncate">Workspace Monitored</p>
+          <p className="text-[11px] text-slate-400 truncate">Agent Ready for Test Run</p>
         </div>
       </div>
 
@@ -109,6 +123,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) =
                   className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
                     item.id === "incident"
                       ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                      : item.id === "autonomous_tester"
+                      ? "bg-cyan-500/30 text-cyan-200 border border-cyan-500/40"
                       : isActive
                       ? "bg-cyan-500/30 text-cyan-200"
                       : "bg-white/5 text-slate-400"
@@ -134,9 +150,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) =
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-            Vector Engine:
+            P8 Runner:
           </span>
-          <span className="text-cyan-400 font-semibold">ChromaDB</span>
+          <span className="text-cyan-400 font-semibold">Playwright/Agent</span>
         </div>
       </div>
     </aside>

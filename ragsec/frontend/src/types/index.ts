@@ -1,10 +1,90 @@
-export type Page = "dashboard" | "knowledge" | "fleet" | "incident" | "mitigation";
+export type Page = 
+  | "dashboard" 
+  | "autonomous_tester"
+  | "test_reports"
+  | "knowledge" 
+  | "fleet" 
+  | "incident" 
+  | "mitigation";
 
 export interface BackendStatus {
   status: string;
   version: string;
   docs: string;
 }
+
+// --- P8 Autonomous Testing Types ---
+
+export type P8TestType = 
+  | "functional" 
+  | "ui_ux" 
+  | "accessibility" 
+  | "navigation" 
+  | "form_input" 
+  | "responsive";
+
+export type BrowserTarget = 
+  | "chromium" 
+  | "firefox" 
+  | "webkit" 
+  | "mobile_ios" 
+  | "mobile_android" 
+  | "tablet";
+
+export interface P8TestRunConfig {
+  target_url: string;
+  target_name: string;
+  scope: "domain_only" | "subdomains" | "single_path";
+  test_types: P8TestType[];
+  browser: BrowserTarget;
+  custom_instructions: string;
+  autonomous_exploration: boolean;
+  max_crawl_depth: number;
+  max_action_budget: number;
+}
+
+export interface P8AgentActivityStep {
+  step_number: number;
+  timestamp: string;
+  action_type: "navigate" | "click" | "type" | "submit" | "screenshot" | "assert" | "inspect";
+  description: string;
+  target_selector?: string;
+  status: "success" | "warning" | "error" | "running";
+  screenshot_url?: string;
+}
+
+export interface P8DetectedIssue {
+  id: string;
+  title: string;
+  severity: "critical" | "high" | "medium" | "low";
+  category: "functional" | "accessibility" | "ui_ux" | "security" | "responsive";
+  affected_url: string;
+  element_selector: string;
+  description: string;
+  reproduction_steps: string[];
+  wcag_rule_id?: string;
+  wcag_level?: "A" | "AA" | "AAA";
+  screenshot_url?: string;
+  status: "open" | "retesting" | "resolved" | "ignored";
+  detected_at: string;
+}
+
+export interface P8TestReport {
+  id: string;
+  target_url: string;
+  target_name: string;
+  started_at: string;
+  completed_at?: string;
+  status: "running" | "paused" | "completed" | "failed";
+  config: P8TestRunConfig;
+  steps_executed: number;
+  pass_rate: number;
+  accessibility_score: number;
+  detected_issues: P8DetectedIssue[];
+  agent_steps: P8AgentActivityStep[];
+}
+
+// --- RAGSec Threat Intelligence Types ---
 
 export interface VectorSearchResult {
   id: string;
@@ -80,7 +160,7 @@ export interface MitigationRule {
   id: string;
   name: string;
   type: "ip_block" | "fim_lock" | "prompt_guard" | "quarantine_auto";
-  status: "active" | "disabled" | "triggered";
+  status: "active" | "disabled";
   target: string;
   action_count: number;
   last_triggered?: string;

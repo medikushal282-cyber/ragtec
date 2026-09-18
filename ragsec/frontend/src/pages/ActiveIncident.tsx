@@ -81,7 +81,7 @@ function CitationCard({ c, active, onClick }: { c: Citation; active: boolean; on
   const typeColors: Record<string, string> = {
     SOP: "#00d4ff",
     ThreatReport: "#f59e0b",
-    Log: "#10b981",
+    Log: "var(--color-primary)",
     MITRE: "#8b5cf6",
   }
   const color = typeColors[c.type]
@@ -162,7 +162,7 @@ function renderContent(text: string, masked: boolean, onCiteClick: (id: string) 
   })
 }
 
-export default function ActiveIncident() {
+export default function ActiveIncident({ demoMode }: { demoMode?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [typing, setTyping] = useState(false)
@@ -306,7 +306,7 @@ export default function ActiveIncident() {
             <div style={{ fontSize: 11, color: "#3d5a7a", fontFamily: "JetBrains Mono, monospace" }}>RAGSec Co-Pilot · Federated RAG · CRC Active</div>
             <div style={{ flex: 1 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, color: masked ? "#f59e0b" : "#10b981", fontFamily: "JetBrains Mono, monospace" }}>
+              <span style={{ fontSize: 10, color: masked ? "#f59e0b" : "var(--color-primary)", fontFamily: "JetBrains Mono, monospace" }}>
                 {masked ? "PII MASKED" : "PII REVEALED"}
               </span>
               <button
@@ -322,7 +322,7 @@ export default function ActiveIncident() {
               >
                 <div style={{
                   width: 14, height: 14, borderRadius: "50%",
-                  background: masked ? "#f59e0b" : "#10b981",
+                  background: masked ? "#f59e0b" : "var(--color-primary)",
                   position: "absolute",
                   top: 2,
                   left: masked ? 2 : 20,
@@ -353,7 +353,7 @@ export default function ActiveIncident() {
                         {isRag ? "RAGSec Agent" : "L2 Analyst"}
                       </span>
                       {msg.confidence !== undefined && (
-                        <span style={{ fontSize: 9, color: msg.confidence > 0.85 ? "#10b981" : msg.confidence > 0.7 ? "#f59e0b" : "#ef4444", fontFamily: "JetBrains Mono, monospace", background: "#0d1629", padding: "1px 5px", borderRadius: 3 }}>
+                        <span style={{ fontSize: 9, color: msg.confidence > 0.85 ? "var(--color-primary)" : msg.confidence > 0.7 ? "#f59e0b" : "#ef4444", fontFamily: "JetBrains Mono, monospace", background: "#0d1629", padding: "1px 5px", borderRadius: 3 }}>
                           θ={msg.confidence.toFixed(2)}
                         </span>
                       )}

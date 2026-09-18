@@ -119,7 +119,8 @@ class RecommendMitigationReq(BaseModel):
 
 
 from api.routes import execute_query
-from models import QueryRequest, IncidentSeverity, SensitivityTier
+from models import QueryRequest, IncidentSeverity, SensitivityTier, Evidence
+from db.database import get_record
 
 @router.post("/incidents/{incident_id}/investigate")
 def investigate_incident_rag(incident_id: str):
@@ -144,10 +145,55 @@ def investigate_incident_rag(incident_id: str):
     ev_context = " ".join([e.raw_message for e in inc.events])
     query = f"We have identified a {threat} threat. The suspicious events are: {ev_context}. What CTI, IOCs, CVEs, or playbooks relate to this, and what mitigation steps are recommended?"
     
+    # Fetch cross-network correlations
+    correlations = pipeline_instance.find_cross_network_correlations()
+    incident_event_ids = {e.id for e in inc.events}
+    
+    print(f"DEBUG RAG: Incident {incident_id} has event IDs {incident_event_ids}")
+    print(f"DEBUG RAG: Found {len(correlations)} correlations")
+    
+    extra_evidence = []
+    seen_event_ids = set()
+    
+    for c in correlations:
+        correlated_event_id = None
+        is_a = False
+        print(f"DEBUG RAG: checking corr {c.event_a_id} <-> {c.event_b_id}")
+        if c.event_a_id in incident_event_ids and c.event_b_id not in incident_event_ids:
+            correlated_event_id = c.event_b_id
+            is_a = False
+        elif c.event_b_id in incident_event_ids and c.event_a_id not in incident_event_ids:
+            correlated_event_id = c.event_a_id
+            is_a = True
+            
+        print(f"DEBUG RAG: correlated_event_id determined as {correlated_event_id}")
+        if correlated_event_id and correlated_event_id not in seen_event_ids:
+            seen_event_ids.add(correlated_event_id)
+            ev_data = get_record("events", correlated_event_id)
+            print(f"DEBUG RAG: fetched ev_data: {ev_data is not None}")
+            if ev_data:
+                net_id = c.network_a if is_a else c.network_b
+                dev_id = c.device_a_id if is_a else c.device_b_id
+                extra_evidence.append(Evidence(
+                    chunk_id=f"EV-{correlated_event_id}",
+                    document_id=correlated_event_id,
+                    source_name=f"Correlated Telemetry ({net_id})",
+                    source_type="telemetry",
+                    text=ev_data.get("raw_message", ""),
+                    similarity_score=1.0,
+                    adjusted_similarity=1.0,
+                    sensitivity_tier=SensitivityTier.RESTRICTED,
+                    network_id=net_id,
+                    device_id=dev_id,
+                    correlation_reason=c.reason
+                ))
+    
+    print(f"DEBUG RAG: extra_evidence size: {len(extra_evidence)}")            
     req = QueryRequest(
         query=query,
         severity=rag_sev,
-        allowed_tiers=[SensitivityTier.PUBLIC, SensitivityTier.INTERNAL, SensitivityTier.RESTRICTED]
+        allowed_tiers=[SensitivityTier.PUBLIC, SensitivityTier.INTERNAL, SensitivityTier.RESTRICTED],
+        extra_evidence=extra_evidence
     )
     
     # Run canonical RAGSec query pipeline

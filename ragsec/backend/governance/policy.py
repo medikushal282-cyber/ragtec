@@ -50,6 +50,10 @@ def evaluate_evidence_policy(
     # Filter by dense similarity AND rerank score (if reranker was used, they differ)
     surviving = []
     for e in evidence:
+        if e.source_type == "telemetry":
+            surviving.append(e)
+            continue
+            
         is_dense_ok = e.similarity_score >= theta_sim
         is_rerank_ok = True
         # If reranker was used, adjusted_similarity contains the logit, which is usually > 0 for relevance.

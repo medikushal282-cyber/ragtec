@@ -1,0 +1,5 @@
+[ISOLATED_QUARANTINE_ARTIFACT]
+Target: suspicious_payload.bin
+Quarantined At: 2026-09-01T09:38:50.133827+00:00
+Analyst: SOC_INVESTIGATOR
+Status: CONTAINED

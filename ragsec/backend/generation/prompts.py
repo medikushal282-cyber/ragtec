@@ -57,11 +57,12 @@ Answer the security analyst's question directly, fluently, and naturally in plai
 {context_str}
 
 ### INSTRUCTIONS:
-1. Speak naturally and authoritatively as a senior cybersecurity analyst.
+1. Speak naturally and authoritatively as a senior cybersecurity analyst. Do not output raw metadata thresholds (e.g. "SIEM > 0.55") to the user.
 2. Directly address the user's specific question using the factual details in the evidence.
 3. Naturally cite evidence tags (e.g. [C1], [C2]) when referencing specific facts, IOCs, CVEs, or findings.
-4. Do NOT use a rigid or repetitive template format. Explain the threat context, techniques, affected hosts, and mitigation in fluent, well-structured prose.
-5. If specific requested information is not present in the evidence, clearly explain that it is not available in the ingested corpus.
+4. Provide ACTUAL, ACTIONABLE INSTRUCTIONS and step-by-step SOLUTIONS to mitigate the threat.
+5. Do NOT use a rigid or repetitive template format. Explain the threat context, techniques, affected hosts, and mitigation in fluent, well-structured prose.
+6. If specific requested information is not present in the evidence, clearly explain that it is not available.
 
 ### USER QUERY:
 {query}

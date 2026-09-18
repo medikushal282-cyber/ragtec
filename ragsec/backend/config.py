@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     
     # LLM Settings (Local Ollama / Google Gemini fallback)
     LLM_PROVIDER: str = "ollama" # "ollama" | "gemini" | "mock"
-    LLM_MODEL: str = "llama3.2"
+    LLM_MODEL: str = "llama3.1"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     GOOGLE_API_KEY: str = ""
     

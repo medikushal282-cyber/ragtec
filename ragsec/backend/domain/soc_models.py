@@ -33,7 +33,9 @@ class MitigationStatus(str, Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     EXECUTED = "EXECUTED"
+    EXECUTED_SIMULATED = "EXECUTED_SIMULATED"
     VERIFIED = "VERIFIED"
+    VERIFIED_SIMULATED = "VERIFIED_SIMULATED"
     FAILED = "FAILED"
 
 class IncidentStatus(str, Enum):

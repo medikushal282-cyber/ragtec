@@ -80,7 +80,7 @@ const ACTION_COLOR: Record<string, string> = {
   PASS: "#3d5a7a",
 }
 
-export default function NetworkSecurity() {
+export default function NetworkSecurity({ demoMode }: { demoMode?: boolean }) {
   const [logs, setLogs] = useState<LogEntry[]>(() => Array.from({ length: 25 }, genLog))
   const [filter, setFilter] = useState<"all" | Severity>("all")
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -156,7 +156,7 @@ export default function NetworkSecurity() {
             borderRadius: 4,
             border: `1px solid ${paused ? "#10b98144" : "#f59e0b44"}`,
             background: paused ? "#10b98111" : "#f59e0b11",
-            color: paused ? "#10b981" : "#f59e0b",
+            color: paused ? "var(--color-primary)" : "#f59e0b",
             cursor: "pointer",
             fontSize: 10,
             fontFamily: "JetBrains Mono, monospace",
@@ -165,8 +165,8 @@ export default function NetworkSecurity() {
           {paused ? "▶ RESUME" : "⏸ PAUSE"}
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}>
-          <div className="dot-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: paused ? "#f59e0b" : "#10b981" }} />
-          <span style={{ color: paused ? "#f59e0b" : "#10b981" }}>{paused ? "PAUSED" : "LIVE"}</span>
+          <div className="dot-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: paused ? "#f59e0b" : "var(--color-primary)" }} />
+          <span style={{ color: paused ? "#f59e0b" : "var(--color-primary)" }}>{paused ? "PAUSED" : "LIVE"}</span>
         </div>
       </div>
 
@@ -300,7 +300,7 @@ export default function NetworkSecurity() {
         flexShrink: 0,
       }}>
         <span style={{ color: "#3d5a7a" }}>SHOWING {filtered.length.toLocaleString()} EVENTS</span>
-        <span style={{ color: "#10b981" }}>BENIGN: {counts.benign}</span>
+        <span style={{ color: "var(--color-primary)" }}>BENIGN: {counts.benign}</span>
         <span style={{ color: "#f59e0b" }}>ANOMALOUS: {counts.anomalous}</span>
         <span style={{ color: "#ef4444" }}>CRITICAL: {counts.critical}</span>
         <span style={{ color: "#3d5a7a", marginLeft: "auto" }}>Snort 3.1.74.0 · Suricata 7.0.3 · ECS 8.11</span>

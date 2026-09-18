@@ -38,7 +38,9 @@ class AuditService:
             previous_hash=prev_hash
         )
 
-        canonical = self._canonicalize(event.model_dump())
+        payload = event.model_dump()
+        payload.pop("current_hash", None)
+        canonical = self._canonicalize(payload)
         hash_input = (prev_hash or "") + canonical.decode("utf-8")
         event.current_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
 
@@ -63,7 +65,9 @@ class AuditService:
             if ev.previous_hash != prev_hash:
                 return f"INVALID: Broken previous-hash link at {ev.id}"
             
-            canonical = self._canonicalize(rec)
+            payload = dict(rec)
+            payload.pop("current_hash", None)
+            canonical = self._canonicalize(payload)
             hash_input = (prev_hash or "") + canonical.decode("utf-8")
             expected_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
             

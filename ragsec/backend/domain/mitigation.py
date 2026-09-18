@@ -83,7 +83,7 @@ class MitigationLifecycle:
         action = self.get_mitigation(action_id)
         if action and action.status == MitigationStatus.APPROVED:
             # SIMULATED EXECUTION
-            action.status = MitigationStatus.EXECUTED
+            action.status = MitigationStatus.EXECUTED_SIMULATED
             db.save_record('mitigations', action.id, action.model_dump(), 'incident_id', action.incident_id)
             
             incident = pipeline_instance.get_incident(action.incident_id)
@@ -99,8 +99,9 @@ class MitigationLifecycle:
 
     def verify_mitigation(self, action_id: str, success: bool, notes: str) -> Optional[MitigationAction]:
         action = self.get_mitigation(action_id)
-        if action and action.status == MitigationStatus.EXECUTED:
-            action.status = MitigationStatus.VERIFIED if success else MitigationStatus.FAILED
+        if action and action.status in [MitigationStatus.EXECUTED, MitigationStatus.EXECUTED_SIMULATED]:
+            # Analyst attested verification (Simulated since we have no infra hook)
+            action.status = MitigationStatus.VERIFIED_SIMULATED if success else MitigationStatus.FAILED
             action.verification_notes = notes
             db.save_record('mitigations', action.id, action.model_dump(), 'incident_id', action.incident_id)
             
@@ -111,7 +112,7 @@ class MitigationLifecycle:
                         m.status = action.status
                         m.verification_notes = action.verification_notes
                 
-                all_done = all(m.status in [MitigationStatus.VERIFIED, MitigationStatus.REJECTED] for m in incident.mitigation_actions)
+                all_done = all(m.status in [MitigationStatus.VERIFIED, MitigationStatus.VERIFIED_SIMULATED, MitigationStatus.REJECTED] for m in incident.mitigation_actions)
                 if all_done:
                     incident.status = IncidentStatus.RESOLVED
                     self.add_audit("SYSTEM", "RESOLVE_INCIDENT", incident.id, "All mitigations processed")

@@ -5,6 +5,13 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-base: #0f111a;
+  --color-card: #181b26;
+  --color-border: #2a2e3d;
+  --color-primary: #10b981; /* Green accent */
+  --color-primary-hover: #059669;
+  --color-text-main: #f3f4f6;
+  --color-text-muted: #9ca3af;
 }
 
 html, body, #root {
@@ -14,56 +21,26 @@ html, body, #root {
 }
 
 body {
-  background-color: #060b18;
-  color: #c8d8ea;
+  background-color: var(--color-base);
+  color: var(--color-text-main);
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 * { box-sizing: border-box; }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1e3055; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: #2d4878; }
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.4); }
-}
-
-@keyframes slide-in-row {
-  from { transform: translateY(-6px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes glow-cyan {
-  0%, 100% { box-shadow: 0 0 6px #00d4ff44; }
-  50% { box-shadow: 0 0 18px #00d4ff88; }
-}
-
-@keyframes scan-line {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-
-@keyframes type-cursor {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.dot-pulse { animation: pulse-dot 2s ease-in-out infinite; }
-.row-appear { animation: slide-in-row 0.25s ease-out; }
-.glow-cyan { animation: glow-cyan 3s ease-in-out infinite; }
-.cursor-blink { animation: type-cursor 1s step-end infinite; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
 .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-.log-benign { color: #5a7a9a; }
-.log-anomalous { color: #f59e0b; }
-.log-critical { color: #ef4444; }
+.log-benign { color: #60a5fa; }
+.log-anomalous { color: #fbbf24; }
+.log-critical { color: #f87171; }
 
-.node-healthy { fill: #10b981; }
-.node-warning { fill: #f59e0b; }
-.node-critical { fill: #ef4444; }
-.node-sensor { fill: #00d4ff; }
+.node-healthy { fill: var(--color-primary); }
+.node-warning { fill: #fbbf24; }
+.node-critical { fill: #f87171; }
+.node-sensor { fill: #38bdf8; }

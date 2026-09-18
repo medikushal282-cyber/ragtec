@@ -72,15 +72,15 @@ const ACTIVE_COUNTERMEASURES: ActiveCountermeasure[] = [
 ]
 
 const PLAYBOOK: PlaybookStep[] = [
-  { id: "pb-1", action: "FIM Alert → Edge Judgment", mode: "auto", description: "Evaluate FIM/IDS event against Sigma rules within 50ms. Classify as Benign/Suspicious.", color: "#10b981" },
+  { id: "pb-1", action: "FIM Alert → Edge Judgment", mode: "auto", description: "Evaluate FIM/IDS event against Sigma rules within 50ms. Classify as Benign/Suspicious.", color: "var(--color-primary)" },
   { id: "pb-2", action: "Suspicious → RAG Investigation", mode: "auto", description: "Query vector DB for historical context. Cross-encoder reranking. Confidence scoring.", color: "#00d4ff" },
-  { id: "pb-3", action: "Block Source IP (P3/P4)", mode: "auto", description: "If confidence ≥ θ_conf and severity ≤ P3: auto-push firewall rule to edge routers.", color: "#10b981" },
+  { id: "pb-3", action: "Block Source IP (P3/P4)", mode: "auto", description: "If confidence ≥ θ_conf and severity ≤ P3: auto-push firewall rule to edge routers.", color: "var(--color-primary)" },
   { id: "pb-4", action: "Quarantine Endpoint (P2)", mode: "manual", description: "Isolate network segment. REQUIRES analyst approval. TTL: 1h default.", color: "#f59e0b" },
   { id: "pb-5", action: "Critical Asset Action (P1)", mode: "manual", description: "DC, DB, or core server actions REQUIRE incident commander approval. All steps logged.", color: "#ef4444" },
   { id: "pb-6", action: "Audit & CRC Verification", mode: "auto", description: "All generated responses validated against source UUIDs. Hallucinations automatically redacted.", color: "#8b5cf6" },
 ]
 
-export default function MitigationCenter() {
+export default function MitigationCenter({ demoMode }: { demoMode?: boolean }) {
   const [pending, setPending] = useState<PendingAction[]>(INITIAL_PENDING)
   const [countermeasures, setCountermeasures] = useState<ActiveCountermeasure[]>(ACTIVE_COUNTERMEASURES)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -114,7 +114,7 @@ export default function MitigationCenter() {
 
         <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {pending.map((item) => {
-            const statusColors: Record<string, string> = { pending: "#f59e0b", approved: "#10b981", denied: "#3d5a7a" }
+            const statusColors: Record<string, string> = { pending: "#f59e0b", approved: "var(--color-primary)", denied: "#3d5a7a" }
             const sc = statusColors[item.status]
             const open = expanded === item.id
             return (
@@ -142,14 +142,14 @@ export default function MitigationCenter() {
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: "#3d5a7a", fontFamily: "JetBrains Mono, monospace" }}>θ_conf</div>
-                    <div style={{ fontSize: 12, fontFamily: "JetBrains Mono, monospace", color: item.confidence > 0.9 ? "#10b981" : "#f59e0b" }}>{item.confidence.toFixed(2)}</div>
+                    <div style={{ fontSize: 12, fontFamily: "JetBrains Mono, monospace", color: item.confidence > 0.9 ? "var(--color-primary)" : "#f59e0b" }}>{item.confidence.toFixed(2)}</div>
                   </div>
                   <span style={{ fontSize: 9, color: impactColor(item.impact), background: impactColor(item.impact) + "22", padding: "2px 8px", borderRadius: 4, fontFamily: "JetBrains Mono, monospace", border: `1px solid ${impactColor(item.impact)}44`, textTransform: "uppercase" }}>{item.impact}</span>
                   {item.status === "pending" ? (
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
                         onClick={(e) => { e.stopPropagation(); approve(item.id) }}
-                        style={{ padding: "4px 12px", background: "#10b98122", border: "1px solid #10b98144", borderRadius: 4, color: "#10b981", cursor: "pointer", fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        style={{ padding: "4px 12px", background: "#10b98122", border: "1px solid #10b98144", borderRadius: 4, color: "var(--color-primary)", cursor: "pointer", fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
                       >✓ Approve</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); deny(item.id) }}
@@ -209,7 +209,7 @@ export default function MitigationCenter() {
                 <td style={{ padding: "8px 12px", color: "#3d5a7a" }}>{cm.started}</td>
                 <td style={{ padding: "8px 12px", color: "#5a7a9a" }}>{cm.ttl}</td>
                 <td style={{ padding: "8px 12px" }}>
-                  <span style={{ color: cm.auto ? "#10b981" : "#f59e0b", fontSize: 9 }}>{cm.auto ? "AUTO" : "MANUAL"}</span>
+                  <span style={{ color: cm.auto ? "var(--color-primary)" : "#f59e0b", fontSize: 9 }}>{cm.auto ? "AUTO" : "MANUAL"}</span>
                 </td>
                 <td style={{ padding: "8px 12px" }}>
                   <button
@@ -256,7 +256,7 @@ export default function MitigationCenter() {
                   <span style={{
                     fontSize: 9,
                     fontFamily: "JetBrains Mono, monospace",
-                    color: step.mode === "auto" ? "#10b981" : "#f59e0b",
+                    color: step.mode === "auto" ? "var(--color-primary)" : "#f59e0b",
                     background: step.mode === "auto" ? "#10b98122" : "#f59e0b22",
                     padding: "1px 6px",
                     borderRadius: 3,
@@ -291,7 +291,7 @@ export default function MitigationCenter() {
               <span style={{ color: "#5a7a9a" }}>{entry.actor}</span>
               <span style={{ color: "#00d4ff" }}>{entry.action}</span>
               <span style={{ color: "#8aa8c8" }}>{entry.target}</span>
-              <span style={{ color: entry.approved === "MANUAL" ? "#f59e0b" : "#10b981" }}>{entry.approved}</span>
+              <span style={{ color: entry.approved === "MANUAL" ? "#f59e0b" : "var(--color-primary)" }}>{entry.approved}</span>
               <span style={{ color: "#1a2d4f" }}>{entry.hash}</span>
             </div>
           ))}

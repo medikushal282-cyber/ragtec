@@ -68,6 +68,9 @@ class Evidence(BaseModel):
     adjusted_similarity: float
     sensitivity_tier: SensitivityTier
     publication_timestamp: Optional[str] = None
+    network_id: Optional[str] = None
+    device_id: Optional[str] = None
+    correlation_reason: Optional[str] = None
     citation_tag: str = "C1"
 
 class CitationInfo(BaseModel):
@@ -100,6 +103,7 @@ class QueryRequest(BaseModel):
     query: str
     severity: IncidentSeverity = IncidentSeverity.LOW
     allowed_tiers: List[SensitivityTier] = Field(default=[SensitivityTier.PUBLIC, SensitivityTier.INTERNAL])
+    extra_evidence: List[Evidence] = Field(default_factory=list)
 
 class QueryResponse(BaseModel):
     status: ResponseStatus

@@ -15,7 +15,7 @@ if os.path.exists(db_path):
         pass
 
 def start_backend():
-    proc = subprocess.Popen(["C:\\Python313\\python.exe", "app.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(["C:\\Python313\\python.exe", "app.py"])
     time.sleep(20)  # Wait for startup
     return proc
 
@@ -50,7 +50,8 @@ try:
         "device_id": "DEV-01",
         "source_type": "ids",
         "event_type": "alert",
-        "raw_message": "Suspicious file detected",
+        "raw_message": "malware detected",
+        "is_suspicious": True,
         "canonical": {"file_hash_sha256": "BADHASH123"}
     }
     e2 = {
@@ -59,7 +60,8 @@ try:
         "device_id": "DEV-02",
         "source_type": "ids",
         "event_type": "alert",
-        "raw_message": "Suspicious file detected",
+        "raw_message": "malware detected",
+        "is_suspicious": True,
         "canonical": {"file_hash_sha256": "BADHASH123"}
     }
     e3 = {
@@ -68,7 +70,8 @@ try:
         "device_id": "DEV-03",
         "source_type": "ids",
         "event_type": "alert",
-        "raw_message": "Different file detected",
+        "raw_message": "malware detected",
+        "is_suspicious": True,
         "canonical": {"file_hash_sha256": "GOODHASH999"}
     }
 
@@ -88,6 +91,24 @@ try:
     assert c["indicator_type"] == "hash"
     assert c["indicator_value"] == "BADHASH123"
     print("  Cross-network correlation test passed!")
+
+    print("=== 3. Testing RAG Investigation ===")
+    # Fetch incident created by EV-1
+    incidents = api_get("/incidents")
+    inc_id = [i["id"] for i in incidents if i["network_id"] == "NET-A"][0]
+    
+    # Investigate
+    rag_res = api_post(f"/incidents/{inc_id}/investigate", {})
+    evidence = rag_res.get("evidence", [])
+    print("RAG RES EVIDENCE DUMP:", evidence)
+    
+    corr_evidence = [ev for ev in evidence if ev.get("source_type") == "telemetry"]
+    
+    assert len(corr_evidence) >= 1, "RAG response should include the correlated telemetry from the other network"
+    ev = corr_evidence[0]
+    assert ev["network_id"] == "NET-B"
+    assert "Shared IOC" in ev["correlation_reason"]
+    print("  RAG correlation injection test passed!")
 
     print("=== ALL BATCH 5 CHECKS PASSED ===")
 finally:

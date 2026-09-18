@@ -66,8 +66,8 @@ def _run_crc_verification(answer: str, evidence_models: List[Evidence], severity
         print(f"[CRC] Verification error: {e}")
         return {
             "citation_check": "ERROR",
-            "warnings": [str(e)],
-            "response_status": "ANSWERED",
+            "warnings": [f"CRC failed closed due to error: {e}"],
+            "response_status": "ERROR",
             "crc_passed": False,
         }
 
@@ -80,7 +80,14 @@ def _run_evidence_gating(evidence_models: List[Evidence], severity: IncidentSeve
         return result
     except Exception as e:
         print(f"[Gating] Policy evaluation error: {e}")
-        return {"passed": True, "status": "SUFFICIENT", "confidence": 0.5, "reason": f"Gating error: {e}"}
+        return {
+            "passed": False, 
+            "status": "ERROR", 
+            "confidence": 0.0, 
+            "reason": f"Gating error (Failed closed): {e}",
+            "surviving_evidence": [],
+            "retrieval_summary": {}
+        }
 
 
 # --- Payloads ---
@@ -189,7 +196,7 @@ def execute_query(req: QueryRequest):
     # --- Step 1: Retrieve ---
     from domain.audit import audit_service
     evidence_dicts = retriever.retrieve(query=req.query, top_n=5)
-    evidence_models = _dicts_to_evidence(evidence_dicts)
+    evidence_models = req.extra_evidence + _dicts_to_evidence(evidence_dicts)
     cross_encoder_active = retriever.reranker.model is not None
 
     # --- Step 2: Evidence Gating ---
@@ -197,7 +204,7 @@ def execute_query(req: QueryRequest):
     is_sufficient = policy.get("passed", True)
 
     # If absolutely zero evidence was found at all or gating failed
-    if not evidence_dicts or len(evidence_dicts) == 0:
+    if not evidence_models or len(evidence_models) == 0:
         audit_service.log_event("SYSTEM", "RAG_ABSTAIN", req.query, "Zero evidence chunks retrieved")
         return {
             "query_id": "Q-NO-EVIDENCE",
@@ -221,7 +228,7 @@ def execute_query(req: QueryRequest):
         return {
             "query_id": f"Q-{hash(req.query) % 100000:05d}",
             "answer": "ABSTAINED: " + policy.get("reason", "Insufficient evidence to support a reliable conclusion."),
-            "evidence": evidence_dicts,
+            "evidence": [e.model_dump() for e in evidence_models],
             "confidence_score": policy.get("confidence", 0.0),
             "status": "ABSTAINED",
             "governance": {

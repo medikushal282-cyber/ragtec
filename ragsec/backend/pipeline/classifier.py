@@ -49,18 +49,18 @@ class RuleBasedClassifier:
             return ThreatClassification(
                 state=ClassificationState.THREAT,
                 category=matched_category,
-                confidence=0.85,
+                confidence=1.0,
                 severity=severity,
-                rationale=f"Pattern match for {matched_category.value} found in event payload."
+                rationale=f"Deterministic regex match for {matched_category.value} found in event payload."
             )
         
         # If suspicious but doesn't match any specific threat rule
         return ThreatClassification(
             state=ClassificationState.UNKNOWN,
             category=ThreatCategory.UNKNOWN,
-            confidence=0.5,
+            confidence=0.0,
             severity="medium",
-            rationale="Event is flagged as suspicious but does not match any known threat taxonomy pattern."
+            rationale="Event flagged as suspicious but does not match any known deterministic threat taxonomy pattern."
         )
 
 classifier_instance = RuleBasedClassifier()

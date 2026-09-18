@@ -201,9 +201,18 @@ class EventPipeline:
         audit_service.log_event("SYSTEM_ORCHESTRATOR", "UPDATE_INCIDENT", incident.id, f"Updated incident status to {incident.status.value}")
 
     def find_cross_network_correlations(self) -> List['CrossNetworkCorrelation']:
-        from domain.soc_models import CrossNetworkCorrelation
+        from domain.soc_models import CrossNetworkCorrelation, SecurityEvent
         correlations = []
-        events = list(self.events.values())
+        
+        # Prevent loading all historical events into memory
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute('SELECT data FROM events ORDER BY rowid DESC LIMIT 2000')
+        rows = c.fetchall()
+        conn.close()
+        
+        import json
+        events = [SecurityEvent(**json.loads(row['data'])) for row in rows]
         
         ioc_map = {}
         for e in events:
@@ -245,11 +254,6 @@ class EventPipeline:
                                 device_b_id=e2.device_id
                             ))
         return correlations
-
-    @property
-    def events(self):
-        rows = db.get_all_records('events')
-        return {row['id']: SecurityEvent(**row) for row in rows}
 
 
 pipeline_instance = EventPipeline()

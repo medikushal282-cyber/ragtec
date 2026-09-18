@@ -1,0 +1,67 @@
+
+FILE INTEGRITY MONITORING & REAL-TIME CRUD ENGINE
+
+FIM Telemetry & Threat Defense
+Scan Workspace
+THREAT IDENTIFIED — ACTIONABLE SECURITY ALERTS (1)
+Mware
+High
+dev_local
+safe.txt
+RISK 95
+Explicit  mallu/exploit keyword in filename or payload identified in file content payload
+
+REQUIRED MITIGATION PLAYBOOK:
+1.
+Quarantine File: Move safe.txt to the isolated .quarantine security enclave and revoke read/execute permissions.
+2.
+Investigate Origin & Parent Process: Inspect process tree, active network sockets, and scheduled tasks related to the file creation.
+3.
+Workspace Integrity Scan: Execute a recursive SHA-256 integrity scan across all neighbor directories.
+3:24:34 PM · MODIFIED
+Quarantine File
+REAL-TIME CRUD AUDIT FEED
+Live watcher active on C:\Projects\RAGTEC\monitored_workspace (Polling every 5s)
+
+25 Files in Quarantine
+Time	Host	CRUD Action	File Path	Threat Classification	Status / Action
+3:24:34 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\safe.txt	 mallu (Risk 95)	Quarantine
+3:24:16 PM	dev_local	RENAMED	C:\Projects\RAGTEC\monitored_workspace\safe.txt	Benign	Active
+3:24:14 PM	dev_local	CREATED	C:\Projects\RAGTEC\monitored_workspace\New Text Document.txt	Benign	Active
+3:23:16 PM	dev_local	DELETED	C:\Projects\RAGTEC\monitored_workspace\ mallu.txt	 mallu (Risk 95)	Quarantine
+3:23:10 PM	dev_local	CREATED	C:\Projects\RAGTEC\monitored_workspace\ mallu.txt	 mallu (Risk 95)	
+Quarantined
+3:21:42 PM	dev_local	SCAN	C:\Projects\RAGTEC\monitored_workspace\Afsheen33.txt	Benign	Active
+3:20:50 PM	dev_local	SCAN	C:\Projects\RAGTEC\monitored_workspace\Ramcharan.txt	 mallu (Risk 95)	
+Quarantined
+3:20:50 PM	dev_local	SCAN	C:\Projects\RAGTEC\monitored_workspace\ mallu1.txt	 mallu (Risk 95)	
+Quarantined
+3:20:40 PM	dev_local	DELETED	C:\Projects\RAGTEC\monitored_workspace\ mallu_e2e.txt	 mallu (Risk 95)	
+Quarantined
+3:20:34 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\ mallu_e2e.txt	 mallu (Risk 95)	
+Quarantined
+3:20:34 PM	dev_local	CREATED	C:\Projects\RAGTEC\monitored_workspace\ mallu_e2e.txt	 mallu (Risk 95)	
+Quarantined
+3:19:36 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\ mallu_live_test.txt	 mallu (Risk 95)	
+Quarantined
+3:19:36 PM	dev_local	CREATED	C:\Projects\RAGTEC\monitored_workspace\ mallu_live_test.txt	 mallu (Risk 95)	
+Quarantined
+3:16:55 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\Ramcharan.txt	 mallu (Risk 95)	
+Quarantined
+3:16:49 PM	dev_local	RENAMED	C:\Projects\RAGTEC\monitored_workspace\Ramcharan.txt	Benign	
+Quarantined
+3:00:38 PM	dev_local	RENAMED	C:\Projects\RAGTEC\monitored_workspace\ mallu1.txt	 mallu (Risk 95)	
+Quarantined
+2:59:28 PM	dev_local	SCAN	C:\Projects\RAGTEC\monitored_workspace\ mallu.txt	 mallu (Risk 95)	
+Quarantined
+2:58:34 PM	dev_not vrus	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\ mallu.txt	 mallu (Risk 95)	
+Quarantined
+2:57:56 PM	dev_local	DELETED	C:\Projects\RAGTEC\monitored_workspace\cryptolocker_payload.ps1	Trojan (Risk 95)	
+Quarantined
+2:57:48 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\cryptolocker_payload.ps1	Ransomware (Risk 95)	
+Quarantined
+2:57:48 PM	dev_local	CREATED	C:\Projects\RAGTEC\monitored_workspace\cryptolocker_payload.ps1	Ransomware (Risk 95)	
+Quarantined
+2:56:35 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\monitored_workspace\Afsheen33.txt	Benign	Active
+2:56:35 PM	dev_local	RENAMED	C:\Projects\RAGTEC\monitored_workspace\Afsheen33.txt	Benign	Active
+2:42:25 PM	dev_local	MODIFIED	C:\Projects\RAGTEC\test_monitor\new_test_file.txt	Benign	Active

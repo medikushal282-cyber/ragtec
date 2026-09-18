@@ -2,97 +2,80 @@ import { useState, useEffect } from "react"
 import type { Page } from "../App"
 
 const PAGE_TITLES: Record<Page, string> = {
-  dashboard: "Global SOC Dashboard",
-  fleet: "Fleet Management & File Integrity Monitoring",
-  network: "Network Security — IDS/IPS Monitor",
-  incident: "Active Incident Investigation — RAGSec Co-Pilot",
-  mitigation: "Threat Mitigation & Response Orchestration",
+  dashboard: "Overview Dashboard",
+  fleet: "Device Management",
+  network: "Network Security",
+  incident: "Active Incidents",
+  mitigation: "Mitigation Operations",
 }
 
-export default function TopBar({ page }: { page: Page }) {
+interface TopBarProps {
+  page: Page;
+  demoMode: boolean;
+  setDemoMode: (val: boolean) => void;
+}
+
+export default function TopBar({ page, demoMode, setDemoMode }: TopBarProps) {
   const [time, setTime] = useState(new Date())
   const [search, setSearch] = useState("")
-  const [threatLevel] = useState<"green" | "yellow" | "red">("yellow")
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  const threatColors = {
-    green: { bg: "#10b98122", border: "#10b98144", text: "#10b981", label: "NOMINAL" },
-    yellow: { bg: "#f59e0b22", border: "#f59e0b44", text: "#f59e0b", label: "ELEVATED" },
-    red: { bg: "#ef444422", border: "#ef444444", text: "#ef4444", label: "CRITICAL" },
-  }
-  const tc = threatColors[threatLevel]
-
   return (
-    <header style={{
-      height: 52,
-      background: "#080f1f",
-      borderBottom: "1px solid #1a2d4f",
-      display: "flex",
-      alignItems: "center",
-      padding: "0 20px",
-      gap: 16,
-      flexShrink: 0,
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#c8d8ea", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+    <header className="h-16 bg-card border-b border-border flex items-center px-6 gap-6 shrink-0 shadow-sm z-10">
+      <div className="flex-1 min-w-0">
+        <h1 className="text-lg font-semibold text-text-main whitespace-nowrap overflow-hidden text-ellipsis">
           {PAGE_TITLES[page]}
-        </div>
+        </h1>
       </div>
 
-      {/* Search */}
-      <div style={{ position: "relative", width: 280 }}>
-        <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.4 }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c8d8ea" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
+      {/* Demo Mode Toggle */}
+      <div className="flex items-center bg-base rounded-full p-1 border border-border shadow-inner">
+        <button 
+          onClick={() => setDemoMode(false)}
+          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+            !demoMode 
+              ? "bg-card text-text-main shadow" 
+              : "text-text-muted hover:text-text-main"
+          }`}
+        >
+          Live
+        </button>
+        <button 
+          onClick={() => setDemoMode(true)}
+          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+            demoMode 
+              ? "bg-primary text-white shadow-md shadow-primary/20" 
+              : "text-text-muted hover:text-text-main"
+          }`}
+        >
+          Demo Auto-Pilot
+        </button>
+      </div>
+
+      {/* Global Search */}
+      <div className="relative w-72">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search IOC, IP, hash, CVE..."
-          style={{
-            width: "100%",
-            background: "#0d1629",
-            border: "1px solid #1a2d4f",
-            borderRadius: 6,
-            padding: "6px 10px 6px 32px",
-            fontSize: 12,
-            color: "#c8d8ea",
-            fontFamily: "JetBrains Mono, monospace",
-            outline: "none",
-          }}
-          onFocus={e => { e.target.style.borderColor = "#00d4ff66" }}
-          onBlur={e => { e.target.style.borderColor = "#1a2d4f" }}
+          placeholder="Search IOC, IP, Hash, CVE..."
+          className="w-full bg-base border border-border rounded-lg py-2 pl-10 pr-4 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
         />
       </div>
 
-      {/* Threat Level */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "5px 12px",
-        background: tc.bg,
-        border: `1px solid ${tc.border}`,
-        borderRadius: 6,
-      }}>
-        <div className="dot-pulse" style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          background: tc.text,
-        }} />
-        <span style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", color: tc.text, fontWeight: 700, letterSpacing: "0.08em" }}>
-          THREAT: {tc.label}
-        </span>
-      </div>
-
-      {/* Time */}
-      <div style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", color: "#3d5a7a", letterSpacing: "0.05em" }}>
-        {time.toLocaleTimeString("en-US", { hour12: false })}
-        <span style={{ marginLeft: 6, color: "#2d4878" }}>UTC</span>
+      {/* User Profile Outline */}
+      <div className="flex items-center gap-3 pl-4 border-l border-border">
+        <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm">
+          SA
+        </div>
       </div>
     </header>
   )

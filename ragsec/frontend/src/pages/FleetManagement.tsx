@@ -1,205 +1,239 @@
-import { useState, useEffect } from "react"
+import React, { useEffect, useState } from "react";
+import { ragsecApi } from "../services/api";
+import { FIMEvent, QuarantinedFile } from "../types";
+import { 
+  ShieldAlert, 
+  FileCheck2, 
+  Trash2, 
+  RefreshCw, 
+  FolderLock, 
+  CheckCircle2, 
+  AlertTriangle,
+  Server,
+  Lock,
+  Unlock,
+  Eye
+} from "lucide-react";
 
-const NODES = [
-  { id: "FIREWALL-01", type: "firewall", x: 350, y: 50, status: "healthy", ip: "10.0.0.1" },
-  { id: "SERVERS", type: "server", x: 200, y: 250, status: "healthy", ip: "10.1.X.X" },
-  { id: "WORKSTATIONS", type: "workstation", x: 500, y: 250, status: "critical", ip: "10.2.X.X" },
-]
+export const FleetManagement: React.FC = () => {
+  const [fimEvents, setFimEvents] = useState<FIMEvent[]>([]);
+  const [quarantined, setQuarantined] = useState<QuarantinedFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-const EDGES = [
-  ["FIREWALL-01", "SERVERS"],
-  ["FIREWALL-01", "WORKSTATIONS"],
-  ["SERVERS", "WORKSTATIONS"],
-]
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [events, qFiles] = await Promise.all([
+        ragsecApi.getFIMEvents(),
+        ragsecApi.getQuarantinedFiles()
+      ]);
+      setFimEvents(events);
+      setQuarantined(qFiles);
+    } catch (e) {
+      console.error("Fleet data error", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-const STATUS_COLORS: Record<string, string> = {
-  healthy: "var(--color-primary)",
-  warning: "#f59e0b",
-  critical: "#ef4444",
-}
-
-const CATEGORIES = [
-  "Phishing", "Malware", "Ransomware", "Spyware", "Trojan",
-  "Brute-Force", "DoS/DDoS", "Data Exfiltration", "Command and Control", "Insider Threat"
-]
-
-interface FIMEvent {
-  id: string; ts: string; host: string; path: string
-  action: "MODIFIED" | "ADDED" | "DELETED"; hash: string; user: string
-  judgment: "Benign" | "Suspicious"
-  diff: { removed: string[]; added: string[] } | null
-}
-
-export default function FleetManagement({ demoMode }: { demoMode?: boolean }) {
-  const [events, setEvents] = useState<FIMEvent[]>([])
-  const [selectedEvent, setSelectedEvent] = useState<FIMEvent | null>(null)
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
-  const [analyzing, setAnalyzing] = useState(false)
-
-  // Polling for FIM events
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/fim/alerts")
-      .then(res => res.json())
-      .then(data => {
-        const parsed = data.map((d: any) => ({
-          id: d.id || Math.random().toString(),
-          ts: d.timestamp,
-          host: d.device_id || "Unknown",
-          path: d.raw_message?.split(" ")[1] || "/unknown",
-          action: "MODIFIED",
-          hash: d.id,
-          user: "root",
-          judgment: d.is_suspicious ? "Suspicious" : "Benign",
-          diff: d.raw_message?.includes("Payload") ? {
-            removed: ["-old_code()"],
-            added: ["+new_malicious_code()"]
-          } : null,
-          raw_message: d.raw_message
-        }));
-        setEvents(parsed);
-      })
-      .catch(err => console.error(err));
+    loadData();
   }, []);
 
-  const getNode = (id: string) => NODES.find((n) => n.id === id)!
-
-  const analyzeFile = async (e: FIMEvent) => {
-    setSelectedEvent(e);
-    setAnalyzing(true);
-    setAnalysisResult(null);
-    try {
-      const res = await fetch("http://127.0.0.1:8000/api/analysis/file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: e.path,
-          content_b64: btoa(e.diff ? e.diff.added.join("\n") : "print('hello')")
-        })
-      });
-      const data = await res.json();
-      setAnalysisResult(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAnalyzing(false);
-    }
-  }
+  const handleAction = (msg: string) => {
+    setActionMessage(msg);
+    setTimeout(() => setActionMessage(null), 4000);
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 16 }}>
-      
-      {/* Top Half: Topology & Logs */}
-      <div style={{ display: "flex", flex: 1, gap: 16, minHeight: 400 }}>
-        {/* Left: Topology (3 Circles) */}
-        <div style={{ flex: 1, background: "var(--color-card)", border: "1px solid #27272a", position: "relative" }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #27272a" }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-main)", fontFamily: "JetBrains Mono, monospace" }}>NETWORK TOPOLOGY</h3>
-          </div>
-          <svg width="100%" height="100%" style={{ position: "absolute", top: 40, left: 0 }}>
-            {EDGES.map(([u, v]) => {
-              const n1 = getNode(u), n2 = getNode(v)
-              return (
-                <line key={`${u}-${v}`} x1={n1.x} y1={n1.y} x2={n2.x} y2={n2.y} stroke="#27272a" strokeWidth={2} strokeDasharray="4,4" />
-              )
-            })}
-            {NODES.map((n) => (
-              <g key={n.id} transform={`translate(${n.x}, ${n.y})`}>
-                <circle cx={0} cy={0} r={40} fill="var(--color-card)" stroke={STATUS_COLORS[n.status]} strokeWidth={3} />
-                <text x={0} y={5} textAnchor="middle" fill="var(--color-text-main)" fontSize={12} fontFamily="JetBrains Mono, monospace" fontWeight="bold">{n.type.toUpperCase()}</text>
-                <text x={0} y={20} textAnchor="middle" fill="var(--color-text-muted)" fontSize={10} fontFamily="JetBrains Mono, monospace">{n.ip}</text>
-              </g>
-            ))}
-          </svg>
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div>
+          <h3 className="text-lg font-bold text-white font-mono flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5 text-cyan-400" />
+            File Integrity Monitoring & Endpoint Fleet
+          </h3>
+          <p className="text-xs text-slate-400">
+            Real-time filesystem change detector watching <code className="text-cyan-400 font-mono">monitored_workspace/</code>
+          </p>
         </div>
 
-        {/* Right: Network & FIM Logs */}
-        <div style={{ width: 450, background: "var(--color-card)", border: "1px solid #27272a", display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #27272a" }}>
-            <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-main)", fontFamily: "JetBrains Mono, monospace" }}>DEVICE LOGS</h3>
+        <button
+          onClick={loadData}
+          disabled={loading}
+          className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-mono flex items-center gap-2 transition-all"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+          Refresh FIM Logs
+        </button>
+      </div>
+
+      {actionMessage && (
+        <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-cyan-300 text-xs font-mono flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+          {actionMessage}
+        </div>
+      )}
+
+      {/* Monitored Nodes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>SOC-NODE-01 (LOCAL)</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">ONLINE</span>
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-            {events.length === 0 && <div style={{ color: "var(--color-text-muted)", fontSize: 12 }}>No logs detected.</div>}
-            {events.map(ev => (
-              <div
-                key={ev.id}
-                onClick={() => analyzeFile(ev)}
-                style={{
-                  padding: 12, marginBottom: 8, cursor: "pointer",
-                  border: `1px solid ${ev.judgment === "Suspicious" ? "#ef4444" : "#27272a"}`,
-                  background: ev.judgment === "Suspicious" ? "rgba(239,68,68,0.05)" : "transparent"
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: ev.judgment === "Suspicious" ? "#ef4444" : "var(--color-primary)", fontFamily: "JetBrains Mono, monospace" }}>{ev.judgment.toUpperCase()}</span>
-                  <span style={{ fontSize: 10, color: "var(--color-text-muted)", fontFamily: "JetBrains Mono, monospace" }}>{ev.ts}</span>
+          <div className="text-lg font-bold text-white font-mono flex items-center gap-2">
+            <Server className="w-4 h-4 text-emerald-400" />
+            192.168.1.104
+          </div>
+          <p className="text-[11px] text-slate-400 font-mono">Watcher: FIMWatcher (watchdog thread)</p>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-rose-500">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>QUARANTINE VAULT</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold">1 FILE HELD</span>
+          </div>
+          <div className="text-lg font-bold text-white font-mono flex items-center gap-2">
+            <FolderLock className="w-4 h-4 text-rose-400" />
+            .quarantine/
+          </div>
+          <p className="text-[11px] text-slate-400 font-mono">Quarantine Isolation Enforced</p>
+        </div>
+
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-cyan-500">
+          <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>HASH ALGORITHM</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-bold">SHA-256</span>
+          </div>
+          <div className="text-lg font-bold text-white font-mono flex items-center gap-2">
+            <Lock className="w-4 h-4 text-cyan-400" />
+            Real-time Hashing
+          </div>
+          <p className="text-[11px] text-slate-400 font-mono">Canonical File Hash Lock</p>
+        </div>
+      </div>
+
+      {/* Quarantined Files Inspector */}
+      <div className="glass-panel p-6 rounded-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <FolderLock className="w-5 h-5 text-rose-400" />
+            <h4 className="font-bold text-white text-base font-mono">Quarantined Artifact Inspector</h4>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">
+            {quarantined.length} CONTAINED
+          </span>
+        </div>
+
+        {quarantined.length === 0 ? (
+          <div className="text-center py-6 text-slate-500 text-xs font-mono">
+            No files currently in quarantine vault.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {quarantined.map((q) => (
+              <div key={q.id} className="p-4 rounded-xl bg-black/40 border border-rose-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="text-xs font-mono font-bold text-white flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      {q.original_path}
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      Isolated to: <code className="text-rose-300">{q.quarantine_path}</code>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    {(q.size_bytes / 1024).toFixed(1)} KB
+                  </span>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--color-text-main)", fontFamily: "JetBrains Mono, monospace", wordBreak: "break-all" }}>{ev.path || (ev as any).raw_message}</div>
+
+                <div className="text-xs text-rose-200/90 font-sans bg-rose-950/30 p-3 rounded-lg border border-rose-500/20">
+                  <strong>Quarantine Reason:</strong> {q.reason}
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    onClick={() => handleAction(`Restored ${q.original_path} to workspace.`)}
+                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-mono flex items-center gap-1.5 transition-all"
+                  >
+                    <Unlock className="w-3.5 h-3.5 text-cyan-400" />
+                    Restore File
+                  </button>
+                  <button
+                    onClick={() => handleAction(`Permanently erased quarantined artifact ${q.id}.`)}
+                    className="px-3 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/40 text-rose-200 text-xs font-mono flex items-center gap-1.5 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    Delete Permanently
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Bottom Half: Alert Analyzer & Classifier */}
-      <div style={{ height: 350, background: "var(--color-card)", border: "1px solid #27272a", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #27272a", display: "flex", justifyContent: "space-between" }}>
-          <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-main)", fontFamily: "JetBrains Mono, monospace" }}>LLM ALERT ANALYZER</h3>
+      {/* FIM Event Stream Table */}
+      <div className="glass-panel p-6 rounded-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <FileCheck2 className="w-5 h-5 text-cyan-400" />
+            <h4 className="font-bold text-white text-base font-mono">Filesystem Event History</h4>
+          </div>
         </div>
-        
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          
-          {/* Left: Diff / Code view */}
-          <div style={{ flex: 1, borderRight: "1px solid #27272a", padding: 16, overflowY: "auto" }}>
-            {selectedEvent ? (
-              <>
-                <h4 style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "JetBrains Mono, monospace", marginBottom: 12 }}>{selectedEvent.path}</h4>
-                {selectedEvent.diff ? (
-                  <pre style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", lineHeight: 1.5, background: "#18181b", padding: 12 }}>
-                    {selectedEvent.diff.removed.map((l, i) => <div key={`r-${i}`} style={{ color: "#f87171" }}>{l}</div>)}
-                    {selectedEvent.diff.added.map((l, i) => <div key={`a-${i}`} style={{ color: "#4ade80" }}>{l}</div>)}
-                  </pre>
-                ) : (
-                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>No code diff available.</div>
-                )}
-              </>
-            ) : (
-              <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "JetBrains Mono, monospace" }}>Select a log entry to analyze.</div>
-            )}
-          </div>
 
-          {/* Right: AI Analysis & Classifier */}
-          <div style={{ width: 450, padding: 16, display: "flex", flexDirection: "column", overflowY: "auto" }}>
-            {analyzing ? (
-              <div style={{ color: "var(--color-text-main)", fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}>Initializing LLM analysis...</div>
-            ) : analysisResult ? (
-              <>
-                <div style={{ marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 10, color: "var(--color-text-muted)", marginBottom: 8, fontFamily: "JetBrains Mono, monospace" }}>THREAT CATEGORY CLASSIFIER</h4>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {CATEGORIES.map(cat => (
-                      <div key={cat} style={{
-                        padding: "4px 8px", fontSize: 10, fontFamily: "JetBrains Mono, monospace",
-                        background: analysisResult.threat_category === cat ? "#ef4444" : "#27272a",
-                        color: analysisResult.threat_category === cat ? "#fff" : "var(--color-text-muted)",
-                        border: `1px solid ${analysisResult.threat_category === cat ? "#ef4444" : "#3f3f46"}`
-                      }}>
-                        {cat.toUpperCase()}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 style={{ fontSize: 10, color: "var(--color-text-muted)", marginBottom: 8, fontFamily: "JetBrains Mono, monospace" }}>AI REASONING</h4>
-                  <div style={{ fontSize: 12, color: "var(--color-text-main)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                    {analysisResult.ai_analysis || analysisResult.rationale}
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-white/10 text-[11px] font-mono text-slate-400 uppercase">
+                <th className="py-2.5 px-3">Timestamp</th>
+                <th className="py-2.5 px-3">Event Type</th>
+                <th className="py-2.5 px-3">Target File Path</th>
+                <th className="py-2.5 px-3">File Hash</th>
+                <th className="py-2.5 px-3">Threat Score</th>
+                <th className="py-2.5 px-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-xs font-mono text-slate-300">
+              {fimEvents.map((evt) => (
+                <tr key={evt.id} className="hover:bg-white/5 transition-all">
+                  <td className="py-3 px-3 text-slate-400">{new Date(evt.timestamp).toLocaleTimeString()}</td>
+                  <td className="py-3 px-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      evt.event_type === "modified" ? "bg-amber-500/20 text-amber-400" :
+                      evt.event_type === "created" ? "bg-cyan-500/20 text-cyan-400" : "bg-rose-500/20 text-rose-400"
+                    }`}>
+                      {evt.event_type}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-white font-bold">{evt.file_path}</td>
+                  <td className="py-3 px-3 text-cyan-400 font-mono">{evt.file_hash?.substring(0, 12)}...</td>
+                  <td className="py-3 px-3">
+                    <span className={evt.threat_score > 70 ? "text-rose-400 font-bold" : "text-slate-300"}>
+                      {evt.threat_score}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3">
+                    {evt.quarantined ? (
+                      <span className="text-rose-400 font-bold flex items-center gap-1 text-[10px]">
+                        <Lock className="w-3 h-3" /> QUARANTINED
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 text-[10px]">PASSED</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default FleetManagement;

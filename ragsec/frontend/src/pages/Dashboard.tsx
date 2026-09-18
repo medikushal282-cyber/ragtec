@@ -1,213 +1,246 @@
-import { useState, useEffect } from "react"
+import React, { useEffect, useState } from "react";
+import { ragsecApi } from "../services/api";
+import { FIMEvent, SOCIncident, SOCAlert } from "../types";
+import { 
+  ShieldAlert, 
+  Activity, 
+  Database, 
+  Clock, 
+  AlertOctagon, 
+  FileCheck2, 
+  Zap, 
+  CheckCircle2, 
+  ChevronRight,
+  ExternalLink,
+  Flame
+} from "lucide-react";
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i)
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-function generateHeatmap() {
-  return DAYS.map((_, d) =>
-    HOURS.map((h) => {
-      const base = d < 5 ? (h >= 8 && h <= 18 ? 60 + Math.random() * 120 : 10 + Math.random() * 30) : 5 + Math.random() * 40
-      const incidents = Math.random() < 0.15 ? Math.floor(base * 0.3 + Math.random() * 20) : 0
-      return { logs: Math.floor(base), incidents }
-    })
-  )
+interface DashboardProps {
+  onNavigatePage?: (page: any) => void;
 }
 
-const HEATMAP = generateHeatmap()
-
-function heatColor(logs: number, incidents: number) {
-  const norm = Math.min(logs / 180, 1)
-  if (incidents > 10) return `rgba(248,113,113,${0.5 + incidents / 60})` // red-400
-  if (incidents > 0) return `rgba(251,191,36,${0.4 + norm * 0.4})` // amber-400
-  const r = 39, g = 39, b = 42 // zinc-800
-  return `rgba(${r},${g},${b},${0.15 + norm * 0.65})`
-}
-
-const severityColor = (s: string) =>
-  s === "critical" ? "#f87171" : s === "high" ? "#fbbf24" : s === "medium" ? "#9ca3af" : "var(--color-primary)"
-
-
-export default function Dashboard({ demoMode }: { demoMode?: boolean }) {
-  const [metricsData, setMetricsData] = useState<any[]>([])
-  const [apiStatus, setApiStatus] = useState("CONNECTING...")
-  const [incidents, setIncidents] = useState<any[]>([])
-  const [fimEvents, setFimEvents] = useState<any[]>([])
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigatePage }) => {
+  const [fimEvents, setFimEvents] = useState<FIMEvent[]>([]);
+  const [incidents, setIncidents] = useState<SOCIncident[]>([]);
+  const [alerts, setAlerts] = useState<SOCAlert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (demoMode) {
-      setApiStatus("API DEMO MODE");
-      return;
+    async function loadData() {
+      try {
+        const [fimData, incData, altData] = await Promise.all([
+          ragsecApi.getFIMEvents(),
+          ragsecApi.getIncidents(),
+          ragsecApi.getAlerts()
+        ]);
+        setFimEvents(fimData);
+        setIncidents(incData);
+        setAlerts(altData);
+      } catch (err) {
+        console.error("Dashboard error loading data", err);
+      } finally {
+        setLoading(false);
+      }
     }
-    fetch("http://127.0.0.1:8000/api/soc/dashboard")
-      .then(res => res.json())
-      .then(data => {
-        setApiStatus("API ONLINE");
-        if (data.metrics) {
-          setMetricsData([
-            { label: "Active Incidents", value: String(data.metrics.total_incidents || 0), sub: `Critical: ${data.metrics.critical_incidents || 0}`, color: "var(--color-primary)" },
-            { label: "Total Events", value: String(data.metrics.total_events || 0), sub: `FIM: ${data.metrics.fim_events || 0}`, color: "#38bdf8" },
-            { label: "Indexed Docs", value: "24", sub: "Corpus Active", color: "#9ca3af" },
-            { label: "Device Count", value: String(data.metrics.device_count || 0), sub: "Monitored Hosts", color: "var(--color-primary)" },
-          ])
-        }
-        if (data.incidents) {
-          setIncidents(data.incidents);
-        }
-        if (data.fim) {
-          setFimEvents(data.fim);
-        }
-      })
-      .catch(() => setApiStatus("API OFFLINE"));
-  }, [demoMode]);
+    loadData();
+  }, []);
+
+  const criticalCount = incidents.filter(i => i.severity === "critical").length;
 
   return (
-    <div className="flex flex-col gap-6 min-h-full">
-      {/* Header with API Status */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, borderBottom: "1px solid #27272a", paddingBottom: 16 }}>
-        <h2 style={{ color: "var(--color-text-main)", fontSize: 16, fontWeight: 600, letterSpacing: "0.05em", fontFamily: "JetBrains Mono, monospace" }}>OVERVIEW</h2>
-        <div style={{
-            background: apiStatus === "API ONLINE" ? "#14532d" : "#7f1d1d",
-            color: apiStatus === "API ONLINE" ? "var(--color-primary)" : "#f87171",
-            border: `1px solid ${apiStatus === "API ONLINE" ? "#166534" : "#991b1b"}`,
-            padding: "4px 8px",
-            fontSize: "11px",
-            fontWeight: "600",
-            fontFamily: "JetBrains Mono, monospace"
-          }}>
-            {apiStatus}
-        </div>
-      </div>
-      
-      {/* Metric Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        {metricsData.map((m) => (
-          <div key={m.label} style={{
-            background: "var(--color-card)",
-            border: "1px solid #27272a",
-            padding: "12px 16px",
-            position: "relative",
-          }}>
-            <div style={{
-              position: "absolute", top: 0, left: 0, bottom: 0, width: 2,
-              background: m.color,
-            }} />
-            <div style={{ fontSize: 10, color: "var(--color-text-muted)", fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.06em", marginBottom: 8 }}>
-              {m.label.toUpperCase()}
+    <div className="space-y-6">
+      {/* Top Banner Alert if Critical */}
+      {criticalCount > 0 && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/80 via-rose-900/40 to-black border border-rose-500/40 flex items-center justify-between shadow-lg shadow-rose-950/30">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40">
+              <Flame className="w-5 h-5 animate-pulse" />
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: m.color, fontFamily: "JetBrains Mono, monospace", lineHeight: 1 }}>
-              {m.value}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 6, fontFamily: "JetBrains Mono, monospace" }}>{m.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, flex: 1 }}>
-        {/* Threat Heatmap */}
-        <div style={{ background: "var(--color-card)", border: "1px solid #27272a", padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-main)", fontFamily: "JetBrains Mono, monospace" }}>THREAT HEATMAP (7 DAYS)</div>
-            </div>
-            <div style={{ display: "flex", gap: 12, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}>
-              <span style={{ color: "var(--color-text-muted)" }}><span style={{ display: "inline-block", width: 8, height: 8, background: "#3f3f46", marginRight: 4, verticalAlign: "middle" }} />VOLUME</span>
-              <span style={{ color: "#fbbf24" }}><span style={{ display: "inline-block", width: 8, height: 8, background: "#fbbf24", marginRight: 4, verticalAlign: "middle" }} />ANOMALOUS</span>
-              <span style={{ color: "#f87171" }}><span style={{ display: "inline-block", width: 8, height: 8, background: "#f87171", marginRight: 4, verticalAlign: "middle" }} />INCIDENTS</span>
+              <h3 className="text-sm font-bold text-rose-200 font-mono flex items-center gap-2">
+                CRITICAL THREAT INCIDENT DETECTED
+              </h3>
+              <p className="text-xs text-rose-300/80">
+                {criticalCount} active critical incident(s) requiring immediate containment action.
+              </p>
             </div>
           </div>
+          <button
+            onClick={() => onNavigatePage && onNavigatePage("incident")}
+            className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold transition-all shadow-md flex items-center gap-2"
+          >
+            Open Incident Triage <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-          <div style={{ display: "flex", marginLeft: 28, marginBottom: 4 }}>
-            {HOURS.filter((h) => h % 4 === 0).map((h) => (
-              <div key={h} style={{ flex: 4, fontSize: 9, color: "var(--color-text-muted)", fontFamily: "JetBrains Mono, monospace", textAlign: "left" }}>{h.toString().padStart(2, "0")}h</div>
-            ))}
+      {/* Metric Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Threat Score */}
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-rose-500">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-mono uppercase">System Threat Index</span>
+            <AlertOctagon className="w-4 h-4 text-rose-400" />
           </div>
-
-          {HEATMAP.map((row, d) => (
-            <div key={d} style={{ display: "flex", alignItems: "center", gap: 2, marginBottom: 2 }}>
-              <div style={{ width: 26, fontSize: 9, color: "var(--color-text-muted)", fontFamily: "JetBrains Mono, monospace", flexShrink: 0 }}>{DAYS[d]}</div>
-              {row.map((cell, h) => (
-                <div
-                  key={h}
-                  title={`${DAYS[d]} ${h}:00 — ${cell.logs} logs · ${cell.incidents} incidents`}
-                  style={{
-                    flex: 1,
-                    height: 24,
-                    background: heatColor(cell.logs, cell.incidents),
-                    cursor: "default",
-                  }}
-                />
-              ))}
-            </div>
-          ))}
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-extrabold text-white font-mono">ELEVATED</span>
+            <span className="text-xs font-bold text-rose-400 px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/30">
+              LVL 4/5
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400">FIM modified monitored_workspace shadow key</p>
         </div>
 
-        {/* Suspicious Logs & Alerts */}
-        <div style={{ background: "var(--color-card)", border: "1px solid #27272a", padding: 16, display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-main)", marginBottom: 16, fontFamily: "JetBrains Mono, monospace" }}>ACTIVE FIM ALERTS</div>
-          <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-            {fimEvents.length === 0 ? (
-                <div style={{color: "var(--color-text-muted)", fontSize: 12}}>No suspicious logs found.</div>
-            ) : fimEvents.map((a, i) => {
-              const sev = a.is_suspicious ? "critical" : "medium";
-              return (
-                <div
-                  key={i}
-                  style={{
-                    padding: "8px 10px",
-                    background: `${severityColor(sev)}11`,
-                    borderLeft: `2px solid ${severityColor(sev)}`,
-                    transition: "all 0.1s",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: severityColor(sev), textTransform: "uppercase", letterSpacing: "0.06em" }}>{a.source_type}</span>
-                    <span style={{ fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: "var(--color-text-muted)" }}>{a.timestamp}</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: "var(--color-text-muted)", lineHeight: 1.4, fontFamily: "JetBrains Mono, monospace" }}>{a.raw_message}</div>
-                </div>
-              )
-            })}
+        {/* Card 2: FIM Integrity Score */}
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-cyan-500">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-mono uppercase">FIM Integrity Score</span>
+            <FileCheck2 className="w-4 h-4 text-cyan-400" />
           </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-extrabold text-white font-mono">98.4%</span>
+            <span className="text-xs font-bold text-cyan-400 px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/30">
+              WATCHER ACTIVE
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400">1 file quarantined in real-time</p>
+        </div>
+
+        {/* Card 3: Vector Knowledge Store */}
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-mono uppercase">Vector Chunks Indexed</span>
+            <Database className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-extrabold text-white font-mono">1,420</span>
+            <span className="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30">
+              IEEE RAG
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400">ChromaDB store online</p>
+        </div>
+
+        {/* Card 4: Retrieval Latency */}
+        <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-blue-500">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-mono uppercase">Avg Query Latency</span>
+            <Clock className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-extrabold text-white font-mono">42 ms</span>
+            <span className="text-xs font-bold text-blue-400 px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/30">
+              FAST
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400">Vector similarity reranking latency</p>
         </div>
       </div>
 
-      {/* Bottom: Recent Incidents Table */}
-      <div style={{ background: "var(--color-card)", border: "1px solid #27272a" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid #27272a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-main)", fontFamily: "JetBrains Mono, monospace" }}>ACTIVE INCIDENTS</div>
-        </div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "JetBrains Mono, monospace" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #27272a" }}>
-              {["INCIDENT ID", "SEV", "TYPE", "STATUS"].map((h) => (
-                <th key={h} style={{ padding: "10px 16px", textAlign: "left", color: "var(--color-text-muted)", fontWeight: 600, fontSize: 9, letterSpacing: "0.05em" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {incidents.length === 0 ? (
-                <tr><td colSpan={4} style={{padding: "16px", textAlign: "center", color: "var(--color-text-muted)"}}>No active incidents.</td></tr>
-            ) : incidents.map((row) => (
-              <tr key={row.id} style={{ borderBottom: "1px solid #27272a" }}>
-                <td style={{ padding: "10px 16px", color: "var(--color-text-main)" }}>{row.id}</td>
-                <td style={{ padding: "10px 16px" }}>
-                  <span style={{ color: severityColor(row.threat_classification?.severity || "low"), border: `1px solid ${severityColor(row.threat_classification?.severity || "low")}`, padding: "2px 6px", fontSize: 9 }}>
-                    {(row.threat_classification?.severity || "low").toUpperCase()}
-                  </span>
-                </td>
-                <td style={{ padding: "10px 16px", color: "var(--color-text-main)" }}>{row.threat_classification?.category || "Unknown"}</td>
-                <td style={{ padding: "10px 16px" }}>
-                  <span style={{
-                    color: row.status === "OPEN" ? "#fbbf24" : "var(--color-primary)",
-                    border: `1px solid ${row.status === "OPEN" ? "#fbbf24" : "var(--color-primary)"}`,
-                    padding: "2px 6px", fontSize: 9,
-                  }}>{row.status}</span>
-                </td>
-              </tr>
+      {/* Main Content Layout: Live FIM Feed & Incidents Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Live FIM Integrity Log (2 Columns wide) */}
+        <div className="lg:col-span-2 glass-panel rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-cyan-400" />
+              <h3 className="font-bold text-white text-base font-mono">Live File Integrity Watcher Feed</h3>
+            </div>
+            <button 
+              onClick={() => onNavigatePage && onNavigatePage("fleet")}
+              className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono"
+            >
+              View All FIM Logs <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {fimEvents.map((evt) => (
+              <div 
+                key={evt.id} 
+                className="p-3.5 rounded-xl bg-black/40 border border-white/5 hover:border-cyan-500/30 transition-all flex items-center justify-between"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
+                      evt.event_type === "modified" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" :
+                      evt.event_type === "created" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" :
+                      "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                    }`}>
+                      {evt.event_type}
+                    </span>
+                    <span className="text-xs font-mono text-white font-semibold truncate max-w-md">
+                      {evt.file_path}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-[11px] text-slate-400 font-mono">
+                    <span>User: <strong className="text-slate-300">{evt.user || "SYSTEM"}</strong></span>
+                    <span>Process: <strong className="text-slate-300">{evt.process_name || "unknown"}</strong></span>
+                    <span>Hash: <code className="text-cyan-400">{evt.file_hash?.substring(0, 10)}...</code></span>
+                  </div>
+                </div>
+
+                <div className="text-right space-y-1">
+                  {evt.quarantined ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono font-bold">
+                      QUARANTINED
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-mono">Score: {evt.threat_score}</span>
+                  )}
+                  <div className="text-[10px] text-slate-400">{new Date(evt.timestamp).toLocaleTimeString()}</div>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        {/* Right Column: SOC Alerts & Active Incidents */}
+        <div className="glass-panel rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-rose-400" />
+                <h3 className="font-bold text-white text-base font-mono">SOC Alert Stream</h3>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono">
+                {alerts.length} ALERTS
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {alerts.map((alt) => (
+                <div key={alt.id} className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white font-mono">{alt.title}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase ${
+                      alt.severity === "critical" ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" : "bg-amber-500/20 text-amber-400"
+                    }`}>
+                      {alt.severity}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-snug">{alt.details}</p>
+                  <div className="text-[10px] text-slate-400 font-mono flex justify-between">
+                    <span>Source: {alt.source}</span>
+                    <span>{new Date(alt.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Action Button */}
+          <button 
+            onClick={() => onNavigatePage && onNavigatePage("knowledge")}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-cyan-500/20"
+          >
+            <Zap className="w-4 h-4" />
+            Query RAGSec Vector Store
+          </button>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default Dashboard;

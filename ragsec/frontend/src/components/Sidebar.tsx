@@ -1,88 +1,146 @@
-import type { Page } from "../App"
+import React from "react";
+import { Page } from "../types";
+import { 
+  LayoutDashboard, 
+  BrainCircuit, 
+  ShieldAlert, 
+  AlertTriangle, 
+  Zap, 
+  ShieldCheck,
+  Terminal,
+  Activity
+} from "lucide-react";
 
-const NAV_GROUPS = [
-  {
-    title: "Overview",
-    items: [
-      { id: "dashboard" as Page, label: "Dashboard", badge: null }
-    ]
-  },
-  {
-    title: "Operations",
-    items: [
-      { id: "network" as Page, label: "Security Events", badge: 12 },
-      { id: "incident" as Page, label: "Incidents", badge: 2 },
-      { id: "fleet" as Page, label: "Devices & FIM", badge: 3 },
-      { id: "mitigation" as Page, label: "Mitigation", badge: 4 },
-      { id: "knowledge" as Page, label: "Knowledge Base", badge: null },
-    ]
-  }
-]
-
-interface Props {
-  page: Page
-  setPage: (p: Page) => void
+interface SidebarProps {
+  currentPage: Page;
+  onSelectPage: (page: Page) => void;
 }
 
-export default function Sidebar({ page, setPage }: Props) {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) => {
+  const navItems = [
+    {
+      id: "dashboard" as Page,
+      label: "SOC Dashboard",
+      icon: LayoutDashboard,
+      badge: "LIVE"
+    },
+    {
+      id: "knowledge" as Page,
+      label: "Threat Intelligence",
+      icon: BrainCircuit,
+      badge: "RAGSec"
+    },
+    {
+      id: "fleet" as Page,
+      label: "Fleet & FIM Monitor",
+      icon: ShieldAlert,
+      badge: "ACTIVE"
+    },
+    {
+      id: "incident" as Page,
+      label: "Incident Triage",
+      icon: AlertTriangle,
+      badge: "3 ALERT"
+    },
+    {
+      id: "mitigation" as Page,
+      label: "Mitigation Rules",
+      icon: Zap,
+      badge: "AUTO"
+    }
+  ];
+
   return (
-    <aside className="w-64 min-w-[256px] bg-card border-r border-border flex flex-col overflow-hidden h-full">
-      {/* Logo */}
-      <div className="p-6 flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/30">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 1l3.09 6.26L22 8.27l-5 4.87 1.18 6.88L12 16.77l-6.18 3.25L7 13.14 2 8.27l6.91-1.01L12 1z" />
-          </svg>
+    <aside className="w-64 h-screen bg-[#070A12] border-r border-white/10 flex flex-col flex-shrink-0 select-none">
+      {/* Brand Header */}
+      <div className="p-5 border-b border-white/10 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <ShieldCheck className="w-6 h-6 text-white" />
         </div>
         <div>
-          <div className="text-xl font-bold text-text-main tracking-wide">RAGSec</div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-bold tracking-wider text-white text-lg font-mono">RAGSec</h1>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-mono">
+              v1.0
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">IEEE Threat Core</p>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-6">
-        {NAV_GROUPS.map(group => (
-          <div key={group.title}>
-            <div className="text-xs font-semibold text-text-muted px-3 mb-2 uppercase tracking-wider">
-              {group.title}
-            </div>
-            <div className="flex flex-col gap-1">
-              {group.items.map((item) => {
-                const active = item.id === page
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setPage(item.id)}
-                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full text-left
-                      ${active 
-                        ? "bg-primary/10 text-primary" 
-                        : "text-text-muted hover:bg-white/5 hover:text-text-main"
-                      }`}
-                  >
-                    <span>{item.label}</span>
-                    {item.badge !== null && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        active ? "bg-primary/20 text-primary" : "bg-white/10 text-text-muted"
-                      }`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+      {/* Real-time Status Card */}
+      <div className="mx-4 my-4 p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 flex items-center gap-3">
+        <div className="relative">
+          <div className="w-3 h-3 rounded-full bg-cyan-400 pulse-dot" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold text-cyan-300 flex items-center justify-between">
+            <span>FIM Engine</span>
+            <span className="text-[10px] text-emerald-400">NORMAL</span>
           </div>
-        ))}
+          <p className="text-[11px] text-slate-400 truncate">Workspace Monitored</p>
+        </div>
+      </div>
+
+      {/* Navigation Items */}
+      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
+        <div className="px-3 py-2 text-[10px] font-mono tracking-wider text-slate-400 uppercase">
+          Command Center
+        </div>
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPage === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSelectPage(item.id)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isActive
+                  ? "bg-gradient-to-r from-cyan-500/20 to-blue-600/10 text-cyan-300 border border-cyan-500/40 shadow-md shadow-cyan-500/10"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                    item.id === "incident"
+                      ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                      : isActive
+                      ? "bg-cyan-500/30 text-cyan-200"
+                      : "bg-white/5 text-slate-400"
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Footer / Upgrade Prompt (from design inspiration) */}
-      <div className="p-4 m-4 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl border border-primary/20 shrink-0">
-        <h3 className="text-sm font-semibold text-text-main mb-1">RAGSec Enterprise</h3>
-        <p className="text-xs text-text-muted mb-3 leading-relaxed">Upgrade to unlock advanced ML threat detection and automated mitigations.</p>
-        <button className="w-full bg-primary hover:bg-primary-hover text-white text-sm font-medium py-2 rounded-lg transition-colors shadow-md shadow-primary/20">
-          Upgrade Plan
-        </button>
+      {/* Footer System Info */}
+      <div className="p-4 border-t border-white/10 text-xs text-slate-400 font-mono space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            Backend API:
+          </span>
+          <span className="text-emerald-400 font-semibold">127.0.0.1:8000</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+            Vector Engine:
+          </span>
+          <span className="text-cyan-400 font-semibold">ChromaDB</span>
+        </div>
       </div>
     </aside>
-  )
-}
+  );
+};
+
+export default Sidebar;

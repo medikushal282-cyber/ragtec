@@ -33,10 +33,24 @@ def init_db():
         data_source TEXT DEFAULT 'live',
         data JSON
     )''')
+    
+    # Migrate columns if existing older schema is present
+    try:
+        c.execute("ALTER TABLE events ADD COLUMN device_id TEXT")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE events ADD COLUMN data_source TEXT DEFAULT 'live'")
+    except Exception:
+        pass
+
     # Index for fast Network->Device->Event chain queries
-    c.execute('''CREATE INDEX IF NOT EXISTS idx_events_network ON events(network_id)''')
-    c.execute('''CREATE INDEX IF NOT EXISTS idx_events_device ON events(device_id)''')
-    c.execute('''CREATE INDEX IF NOT EXISTS idx_devices_network ON devices(network_id)''')
+    try:
+        c.execute('''CREATE INDEX IF NOT EXISTS idx_events_network ON events(network_id)''')
+        c.execute('''CREATE INDEX IF NOT EXISTS idx_events_device ON events(device_id)''')
+        c.execute('''CREATE INDEX IF NOT EXISTS idx_devices_network ON devices(network_id)''')
+    except Exception:
+        pass
     c.execute('''CREATE TABLE IF NOT EXISTS incidents (id TEXT PRIMARY KEY, network_id TEXT, data JSON)''')
     c.execute('''CREATE TABLE IF NOT EXISTS mitigations (id TEXT PRIMARY KEY, incident_id TEXT, data JSON)''')
     c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, data JSON)''')
@@ -169,7 +183,7 @@ def get_knowledge_sources():
     c.execute('SELECT * FROM documents ORDER BY created_at DESC')
     docs = [dict(row) for row in c.fetchall()]
     
-    # Enrich with entity counts/previews to show in UI
+    # Enrich with entity counts/previews and AI classification to show in UI
     for d in docs:
         c.execute('''SELECT e.entity_type, e.entity_value FROM entities e 
                      JOIN chunk_entities ce ON e.id = ce.entity_id 
@@ -179,6 +193,23 @@ def get_knowledge_sources():
         d['extractedEntities'] = [f"{r['entity_type']}:{r['entity_value']}" for r in ents]
         d['chunkCount'] = d['chunk_count']
         d['mimeType'] = d['mime_type']
+
+        # Parse stored doc_data for AI tags
+        try:
+            doc_data = json.loads(d.get('data') or '{}')
+            d['doc_type'] = doc_data.get('doc_type', 'THREAT_CLASSIFICATION_INTEL')
+            d['target_categories'] = doc_data.get('target_categories', [])
+            d['primary_category'] = doc_data.get('primary_category', doc_data.get('target_categories', ['Threat Intelligence'])[0] if doc_data.get('target_categories') else 'Threat Intelligence')
+            d['mitigation_steps'] = doc_data.get('mitigation_steps', [])
+            d['summary'] = doc_data.get('summary', '')
+            d['confidence'] = doc_data.get('confidence', 0.95)
+        except Exception:
+            d['doc_type'] = 'THREAT_CLASSIFICATION_INTEL'
+            d['target_categories'] = []
+            d['primary_category'] = 'Threat Intelligence'
+            d['mitigation_steps'] = []
+            d['summary'] = ''
+            d['confidence'] = 0.90
         
     conn.close()
     return docs

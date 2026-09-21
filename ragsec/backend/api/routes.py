@@ -92,6 +92,8 @@ def _run_evidence_gating(evidence_models: List[Evidence], severity: IncidentSeve
 
 # --- Payloads ---
 
+from ingestion.classifier_service import classify_and_tag_knowledge
+
 class IngestDocPayload(BaseModel):
     title: Optional[str] = None
     content: str
@@ -100,6 +102,12 @@ class IngestDocPayload(BaseModel):
     sensitivity_tier: SensitivityTier = SensitivityTier.INTERNAL
     publication_timestamp: Optional[str] = None
     url: Optional[str] = None
+    doc_type: Optional[str] = None
+    target_categories: Optional[List[str]] = None
+
+class ClassifyPreviewPayload(BaseModel):
+    title: Optional[str] = None
+    content: str
 
 class RetrievePayload(BaseModel):
     query: str
@@ -115,10 +123,26 @@ def health_check():
     return {"status": "healthy", "service": "RAGSec-Core", "indexed_chunks_count": vector_store.count()}
 
 
+@router.post("/knowledge/classify-preview")
+def classify_preview(payload: ClassifyPreviewPayload):
+    """
+    Analyzes document text in real time before ingestion:
+    Returns doc_type, target_categories, mitigation_steps, TTPs, CVEs, IOCs, summary, and confidence.
+    """
+    if not payload.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty.")
+    classification = classify_and_tag_knowledge(payload.content, payload.title)
+    return classification
+
+
+@router.post("/knowledge/classify-and-ingest")
 @router.post("/ingest")
 def ingest_document(payload: IngestDocPayload):
     if not payload.content.strip():
         raise HTTPException(status_code=400, detail="Document content cannot be empty.")
+
+    # 1. Run AI / NLP Knowledge Classification & Tagging
+    classification = classify_and_tag_knowledge(payload.content, payload.title)
 
     doc = create_canonical_document(
         content=payload.content, source_name=payload.source_name, source_type=payload.source_type,
@@ -126,23 +150,39 @@ def ingest_document(payload: IngestDocPayload):
         publication_timestamp=payload.publication_timestamp, url=payload.url
     )
 
+    doc_data = doc.model_dump()
+    # Merge rich AI classification metadata
+    doc_data["doc_type"] = payload.doc_type or classification["doc_type"]
+    doc_data["target_categories"] = payload.target_categories or classification["target_categories"]
+    doc_data["primary_category"] = classification["primary_category"]
+    doc_data["mitigation_steps"] = classification["mitigation_steps"]
+    doc_data["summary"] = classification["summary"]
+    doc_data["confidence"] = classification["confidence"]
+    doc_data["cves"] = classification["cves"]
+    doc_data["ttps"] = classification["ttps"]
+
     chunks = chunk_document(doc)
-    mime = "application/json" if payload.source_name.endswith(".json") else "text/csv" if payload.source_name.endswith(".csv") else "text/plain"
+    mime = "application/json" if payload.source_name.endswith(".json") else "text/csv" if payload.source_name.endswith(".csv") else "text/markdown" if payload.source_name.endswith(".md") else "text/plain"
 
     if chunks:
-        save_knowledge_document(doc.document_id, payload.source_name, mime, chunks, doc.model_dump())
+        save_knowledge_document(doc.document_id, payload.source_name, mime, chunks, doc_data)
         texts = [c.text for c in chunks]
         embeddings = embedder.embed_texts(texts)
         vector_store.upsert_chunks(chunks, embeddings)
 
     from domain.audit import audit_service
-    audit_service.log_event("SYSTEM", "INGEST_KNOWLEDGE", payload.source_name, f"Ingested {len(chunks)} chunks")
+    audit_service.log_event("SYSTEM", "INGEST_KNOWLEDGE", payload.source_name, f"Ingested {len(chunks)} chunks [{doc_data['doc_type']}]")
 
     return {
         "status": "ingested",
         "document_id": doc.document_id,
         "chunks_extracted": len(chunks),
         "content_hash": doc.content_hash,
+        "classification": classification,
+        "doc_type": doc_data["doc_type"],
+        "target_categories": doc_data["target_categories"],
+        "mitigation_steps": doc_data["mitigation_steps"],
+        "summary": doc_data["summary"],
         "extracted_entities": doc.extracted_entities.model_dump()
     }
 
@@ -159,7 +199,13 @@ def api_get_knowledge_sources():
             "chunkCount": d["chunk_count"],
             "ingestionStatus": d["status"],
             "createdAt": d["created_at"],
-            "extractedEntities": d.get("extractedEntities", [])
+            "extractedEntities": d.get("extractedEntities", []),
+            "doc_type": d.get("doc_type", "THREAT_CLASSIFICATION_INTEL"),
+            "target_categories": d.get("target_categories", []),
+            "primary_category": d.get("primary_category", "Threat Intelligence"),
+            "mitigation_steps": d.get("mitigation_steps", []),
+            "summary": d.get("summary", ""),
+            "confidence": d.get("confidence", 0.95)
         })
     return res
 

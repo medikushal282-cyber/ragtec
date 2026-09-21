@@ -1,3 +1,47 @@
+# Dependencies & Builds
 node_modules/
 dist/
+build/
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Databases & Vector Stores (Local instance data)
+*.db
+*.sqlite3
+*.db-journal
+ragsec/data/vector_store/
+ragsec/tests/test_vector_db/
+ragsec/backend/ragsec.db
+ragsec/ragsec.db
+ragsec.db
+
+# Large / Generated binary files
+*.bin
+
+# Logs & Quarantine
+*.log
+app_log.txt
+.quarantine/
+.pytest_cache/
+.coverage
+
+# Monitored workspace test artifacts
+monitored_workspace/malware_simulation.exe
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

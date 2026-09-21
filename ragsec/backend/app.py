@@ -7,11 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router as api_router
 from api.soc_routes import router as soc_router
 from api.analysis_routes import router as analysis_router
+from api.fim_routes import router as fim_router
+from api.model_routes import router as model_router
+from api.dashboard_routes import router as dashboard_router
+from api.test_routes import router as test_router
+from api.audit_routes import router as audit_router
+from api.sps_routes import router as sps_router
+from api.siem_routes import router as siem_router
+from api.governance_routes import router as governance_router
 from config import settings
 
 from contextlib import asynccontextmanager
 from ingestion.fim.watcher import FIMWatcher
-from api.fim_routes import router as fim_router
 import os
 
 @asynccontextmanager
@@ -44,6 +51,13 @@ app.include_router(api_router)
 app.include_router(soc_router)
 app.include_router(fim_router)
 app.include_router(analysis_router)
+app.include_router(model_router)
+app.include_router(dashboard_router)
+app.include_router(test_router)
+app.include_router(audit_router)
+app.include_router(sps_router)
+app.include_router(siem_router)
+app.include_router(governance_router)
 
 @app.get("/")
 def root_status():

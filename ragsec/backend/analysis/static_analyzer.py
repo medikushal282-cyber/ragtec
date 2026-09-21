@@ -99,9 +99,31 @@ def run_static_analysis(filename: str, content: bytes) -> StaticAnalysisResult:
     size = len(content)
 
     if not _is_text(content):
+        # Extract ASCII / UTF-8 strings from binary to detect PE API imports and anomalies
+        extracted_strings = re.findall(rb"[A-Za-z0-9_\-\.]{4,}", content)
+        text_from_bin = " ".join(s.decode('ascii', errors='ignore') for s in extracted_strings)
+        signals: List[StaticSignal] = []
+        is_pe = content[:2] == b"MZ" or filename.lower().endswith((".exe", ".dll", ".bin", ".sys"))
+        if is_pe and any(api.lower() in text_from_bin.lower() for api in ["virtualalloc", "createremotethread", "writeprocessmemory", "cmd.exe", "powershell"]):
+            signals.append(StaticSignal(
+                line_no=1,
+                line_content="PE Header Import Anomaly: Process Injection & Shell Execution APIs",
+                label="PE Header Import Anomaly: Process Injection APIs",
+                severity_weight=3
+            ))
+
+        for pattern, label, weight in _BEHAVIORAL_RULES:
+            if re.search(pattern, text_from_bin):
+                signals.append(StaticSignal(
+                    line_no=1,
+                    line_content=text_from_bin[:200],
+                    label=label,
+                    severity_weight=weight
+                ))
+
         return StaticAnalysisResult(
             sha256=sha, file_type=ext or "binary", file_size=size,
-            is_text=False, signals=[]
+            is_text=False, signals=signals
         )
 
     try:

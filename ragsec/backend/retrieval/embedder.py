@@ -7,6 +7,8 @@ from typing import List
 import numpy as np
 from config import settings
 
+_EMBEDDER_CACHE = {}
+
 class Embedder:
     def __init__(self, model_name: str = settings.EMBEDDING_MODEL):
         self.model_name = model_name
@@ -14,9 +16,14 @@ class Embedder:
         self._load_model()
         
     def _load_model(self):
+        global _EMBEDDER_CACHE
+        if self.model_name in _EMBEDDER_CACHE:
+            self.model = _EMBEDDER_CACHE[self.model_name]
+            return
         try:
             from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(self.model_name)
+            _EMBEDDER_CACHE[self.model_name] = self.model
         except Exception as e:
             print(f"[Embedder] Notice: Running with fallback embedding generator: {e}")
             self.model = None

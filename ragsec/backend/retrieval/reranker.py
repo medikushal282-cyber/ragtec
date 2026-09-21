@@ -1,9 +1,11 @@
-﻿"""
+"""
 ragsec.backend.retrieval.reranker
 Cross-encoder reranking for semantic relevance refinement.
 """
 from typing import List, Dict, Any
 from config import settings
+
+_RERANKER_CACHE = {}
 
 class Reranker:
     def __init__(self, model_name: str = settings.RERANKER_MODEL):
@@ -12,9 +14,14 @@ class Reranker:
         self._load_model()
         
     def _load_model(self):
+        global _RERANKER_CACHE
+        if self.model_name in _RERANKER_CACHE:
+            self.model = _RERANKER_CACHE[self.model_name]
+            return
         try:
             from sentence_transformers import CrossEncoder
             self.model = CrossEncoder(self.model_name)
+            _RERANKER_CACHE[self.model_name] = self.model
         except Exception as e:
             print(f"[Reranker] Notice: Running with fallback reranker: {e}")
             self.model = None

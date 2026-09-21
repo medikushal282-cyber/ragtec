@@ -30,11 +30,15 @@ class Settings(BaseSettings):
     # Reranker Model (Configurable)
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     
-    # LLM Settings (Local Ollama / Google Gemini fallback)
-    LLM_PROVIDER: str = "ollama" # "ollama" | "gemini" | "mock"
+    # LLM Settings (Local Ollama, Groq, OpenRouter, Google Gemini)
+    LLM_PROVIDER: str = "ollama" # "ollama" | "groq" | "openrouter" | "gemini" | "mock"
     LLM_MODEL: str = "llama3.1"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     GOOGLE_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct"
     
     # Retrieval Defaults
     RETRIEVAL_TOP_K: int = 6

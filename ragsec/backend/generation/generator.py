@@ -21,52 +21,201 @@ class Generator:
         self.ollama_url = ollama_url
         self.google_api_key = google_api_key
 
-    def generate(self, prompt: str) -> Dict[str, Any]:
+    def generate(
+        self,
+        prompt: str,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        messages: Optional[list] = None
+    ) -> Dict[str, Any]:
         """
-        Executes generation using the configured provider.
-        Returns {"answer": str, "provider": str}.
+        Executes generation using the configured or explicitly requested provider:
+        - groq: Fast Llama-3.3-70b / Mixtral via Groq API
+        - openrouter: OpenRouter API (Claude, Llama, DeepSeek, Mistral, GPT-4o)
+        - ollama: Local Ollama server (default http://localhost:11434)
+        - lmstudio / local: LM Studio or OpenAI-compatible local server (default http://localhost:1234/v1)
+        - gemini: Google Gemini API (gemini-2.0-flash, gemini-1.5-pro, etc.)
         """
+        selected_provider = (provider or self.provider or "ollama").lower()
+        
         # 0. Test Mock
-        if os.environ.get("MOCK_LLM"):
-            mock_ans = os.environ.get("MOCK_LLM_RESPONSE", "This is a mock answer based on [C1] and [C2].")
-            return {"answer": mock_ans, "provider": "mock"}
+        if os.environ.get("MOCK_LLM") or selected_provider == "mock":
+            mock_ans = os.environ.get("MOCK_LLM_RESPONSE", "This is a mock answer grounded in retrieved security playbooks.")
+            return {"answer": mock_ans, "provider": "mock", "model": "mock"}
 
-        # 1. Try Local Ollama
-        if self.provider == "ollama":
+        # 1. Try Groq API
+        if (selected_provider == "groq" or (api_key and "gsk_" in api_key)) and (api_key or settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY")):
+            groq_key = api_key or settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
+            groq_model = model or settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+            if groq_key:
+                try:
+                    chat_msgs = []
+                    if system_prompt:
+                        chat_msgs.append({"role": "system", "content": system_prompt})
+                    if messages:
+                        chat_msgs.extend(messages)
+                    else:
+                        chat_msgs.append({"role": "user", "content": prompt})
+
+                    headers = {
+                        "Authorization": f"Bearer {groq_key}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": groq_model,
+                        "messages": chat_msgs,
+                        "temperature": 0.2,
+                        "max_tokens": 2048
+                    }
+                    resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=8)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        ans = data["choices"][0]["message"]["content"].strip()
+                        if ans:
+                            return {"answer": ans, "provider": "Groq Cloud", "model": groq_model}
+                    else:
+                        print(f"[Generator] Groq API returned status {resp.status_code}: {resp.text}")
+                except Exception as e:
+                    print(f"[Generator] Groq API request failed: {e}. Falling back...")
+
+        # 2. Try OpenRouter API
+        if (selected_provider == "openrouter" or (api_key and "sk-or-" in api_key)) and (api_key or settings.OPENROUTER_API_KEY or os.environ.get("OPENROUTER_API_KEY")):
+            or_key = api_key or settings.OPENROUTER_API_KEY or os.environ.get("OPENROUTER_API_KEY", "")
+            or_model = model or settings.OPENROUTER_MODEL or "meta-llama/llama-3.3-70b-instruct"
+            if or_key:
+                try:
+                    chat_msgs = []
+                    if system_prompt:
+                        chat_msgs.append({"role": "system", "content": system_prompt})
+                    if messages:
+                        chat_msgs.extend(messages)
+                    else:
+                        chat_msgs.append({"role": "user", "content": prompt})
+
+                    headers = {
+                        "Authorization": f"Bearer {or_key}",
+                        "HTTP-Referer": "https://ragsec.local",
+                        "X-Title": "RAGSec SOC Copilot",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": or_model,
+                        "messages": chat_msgs,
+                        "temperature": 0.2,
+                        "max_tokens": 2048
+                    }
+                    resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=8)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        ans = data["choices"][0]["message"]["content"].strip()
+                        if ans:
+                            return {"answer": ans, "provider": "OpenRouter Cloud", "model": or_model}
+                    else:
+                        print(f"[Generator] OpenRouter API returned status {resp.status_code}: {resp.text}")
+                except Exception as e:
+                    print(f"[Generator] OpenRouter API request failed: {e}. Falling back...")
+
+        # 3. Try Local Ollama
+        if selected_provider == "ollama":
+            ollama_url = (base_url or self.ollama_url or "http://localhost:11434").rstrip("/")
+            ollama_model = model or self.model or "llama3.1"
             try:
-                resp = requests.post(
-                    f"{self.ollama_url}/api/generate",
-                    json={"model": self.model, "prompt": prompt, "stream": False},
-                    timeout=45
+                # First try chat API with quick connection timeout
+                chat_msgs = []
+                if system_prompt:
+                    chat_msgs.append({"role": "system", "content": system_prompt})
+                if messages:
+                    chat_msgs.extend(messages)
+                else:
+                    chat_msgs.append({"role": "user", "content": prompt})
+
+                chat_resp = requests.post(
+                    f"{ollama_url}/api/chat",
+                    json={"model": ollama_model, "messages": chat_msgs, "stream": False},
+                    timeout=(1.5, 10.0)
                 )
-                if resp.status_code == 200:
-                    text = resp.json().get("response", "").strip()
+                if chat_resp.status_code == 200:
+                    text = chat_resp.json().get("message", {}).get("content", "").strip()
                     if text:
-                        return {"answer": text, "provider": "ollama"}
+                        return {"answer": text, "provider": "Local Ollama", "model": ollama_model}
+
+                # Fallback to generate endpoint
+                gen_resp = requests.post(
+                    f"{ollama_url}/api/generate",
+                    json={"model": ollama_model, "prompt": prompt, "system": system_prompt or "", "stream": False},
+                    timeout=(1.5, 10.0)
+                )
+                if gen_resp.status_code == 200:
+                    text = gen_resp.json().get("response", "").strip()
+                    if text:
+                        return {"answer": text, "provider": "Local Ollama", "model": ollama_model}
             except Exception as e:
                 print(f"[Generator] Ollama connection failed: {e}. Falling back...")
 
-        # 2. Try Google Gemini API if API key is provided
-        api_key = self.google_api_key or os.environ.get("GOOGLE_API_KEY", "")
-        if api_key:
+        # 4. Try LM Studio / Local OpenAI Compatible
+        if selected_provider in ("lmstudio", "local", "localai"):
+            lms_url = (base_url or "http://localhost:1234/v1").rstrip("/")
+            lms_model = model or "local-model"
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-                payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                resp = requests.post(url, json=payload, timeout=45)
+                chat_msgs = []
+                if system_prompt:
+                    chat_msgs.append({"role": "system", "content": system_prompt})
+                if messages:
+                    chat_msgs.extend(messages)
+                else:
+                    chat_msgs.append({"role": "user", "content": prompt})
+
+                payload = {
+                    "model": lms_model,
+                    "messages": chat_msgs,
+                    "temperature": 0.2,
+                    "max_tokens": 2048
+                }
+                resp = requests.post(f"{lms_url}/chat/completions", json=payload, timeout=(1.5, 10.0))
                 if resp.status_code == 200:
                     data = resp.json()
-                    ans = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    ans = data["choices"][0]["message"]["content"].strip()
                     if ans:
-                        return {"answer": ans, "provider": "gemini"}
+                        return {"answer": ans, "provider": "LM Studio Local", "model": lms_model}
             except Exception as e:
-                print(f"[Generator] Gemini API connection failed: {e}. Falling back...")
+                print(f"[Generator] LM Studio / Local server failed: {e}. Falling back...")
 
-        # 3. Return explicit error state if no LLM is available
-        return {
-            "answer": "ERROR: LLM unavailable or timed out. Unable to generate grounded response.",
-            "provider": "error",
-            "error": True
-        }
+        # 5. Try Google Gemini API
+        gemini_key = api_key or self.google_api_key or os.environ.get("GOOGLE_API_KEY", "")
+        if gemini_key or selected_provider == "gemini":
+            if gemini_key:
+                gemini_model = (model or "gemini-2.0-flash").replace("models/", "")
+                try:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}"
+                    combined_text = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+                    payload = {"contents": [{"parts": [{"text": combined_text}]}]}
+                    resp = requests.post(url, json=payload, timeout=45)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        ans = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                        if ans:
+                            return {"answer": ans, "provider": "Google Gemini", "model": gemini_model}
+                except Exception as e:
+                    print(f"[Generator] Gemini API connection failed: {e}. Falling back...")
+
+        # 6. Fallback Grounded Synthesizer
+        try:
+            synthesized = self._synthesize_natural_answer(prompt)
+            return {
+                "answer": synthesized,
+                "provider": "RAGSec Grounded Playbook Engine",
+                "model": "SOC Heuristics (Offline Fallback)",
+                "fallback": True
+            }
+        except Exception:
+            return {
+                "answer": "ERROR: LLM unavailable or timed out. Unable to generate grounded response.",
+                "provider": "error",
+                "error": True
+            }
 
     def _synthesize_natural_answer(self, prompt: str) -> str:
         """

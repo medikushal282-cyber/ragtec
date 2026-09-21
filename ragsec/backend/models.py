@@ -66,7 +66,7 @@ class Evidence(BaseModel):
     masked_text: Optional[str] = None
     similarity_score: float
     adjusted_similarity: float
-    sensitivity_tier: SensitivityTier
+    sensitivity_tier: SensitivityTier = SensitivityTier.INTERNAL
     publication_timestamp: Optional[str] = None
     network_id: Optional[str] = None
     device_id: Optional[str] = None

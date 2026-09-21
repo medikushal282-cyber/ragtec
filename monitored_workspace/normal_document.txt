@@ -1,0 +1,3 @@
+Enterprise Security Standard Operating Procedure (SOP-042).
+All endpoint logs must be forwarded to the centralized SIEM.
+Audit records are retained for 365 days in accordance with ISO 27001 standard.

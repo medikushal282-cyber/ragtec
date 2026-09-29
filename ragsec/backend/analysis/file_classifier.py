@@ -182,7 +182,7 @@ def classify_file(
         sha256=static_result.sha256,
         timestamp=ts,
         data_source=data_source,
-        classification=category_val if threat_state == "THREAT" else threat_state,
+        classification="THREAT" if threat_state == "THREAT" else ("UNKNOWN" if threat_state == "UNKNOWN" else "BENIGN"),
         threat_category=category_val,
         threat_state=threat_state,
         severity=severity,
@@ -194,3 +194,4 @@ def classify_file(
         linked_event_id=linked_event_id,
         linked_incident_id=linked_incident_id,
     )
+

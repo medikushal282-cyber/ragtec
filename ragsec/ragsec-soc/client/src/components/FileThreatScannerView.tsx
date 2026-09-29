@@ -234,34 +234,60 @@ vssadmin.exe delete shadows /all /quiet
             </div>
           )}
 
-          {scanResult && !isScanning && (
+          {scanResult && !isScanning && (() => {
+            const isThreat = 
+              scanResult.threat_state === "THREAT" || 
+              scanResult.classification === "THREAT" || 
+              (scanResult.threat_category && !["benign", "safe", "n/a", "unknown"].includes(scanResult.threat_category.toLowerCase())) ||
+              (scanResult.severity && ["critical", "high", "medium"].includes(scanResult.severity.toLowerCase())) ||
+              (scanResult.risk_score && scanResult.risk_score >= 50) ||
+              (scanResult.deterministic_signals && scanResult.deterministic_signals.length > 0);
+
+            const isUnknown = !isThreat && (scanResult.threat_state === "UNKNOWN" || scanResult.classification === "UNKNOWN");
+
+            return (
             <div className="space-y-4">
               {/* Classification Banner */}
-              <div className={`p-4 rounded-xl border flex items-center justify-between ${
-                scanResult.classification === "THREAT"
-                  ? "bg-rose-950/40 border-rose-500/50 text-rose-200"
-                  : scanResult.classification === "UNKNOWN"
-                  ? "bg-amber-950/40 border-amber-500/50 text-amber-200"
-                  : "bg-emerald-950/40 border-emerald-500/50 text-emerald-200"
+              <div className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
+                isThreat
+                  ? "bg-rose-950/60 border-rose-500/70 text-rose-200 shadow-lg shadow-rose-950/50"
+                  : isUnknown
+                  ? "bg-amber-950/60 border-amber-500/70 text-amber-200"
+                  : "bg-emerald-950/60 border-emerald-500/70 text-emerald-200"
               }`}>
                 <div className="flex items-center gap-3">
-                  {scanResult.classification === "THREAT" ? (
-                    <AlertOctagon className="w-6 h-6 text-rose-400" />
+                  {isThreat ? (
+                    <AlertOctagon className="w-7 h-7 text-rose-400 shrink-0" />
+                  ) : isUnknown ? (
+                    <AlertTriangle className="w-7 h-7 text-amber-400 shrink-0" />
                   ) : (
-                    <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                    <ShieldCheck className="w-7 h-7 text-emerald-400 shrink-0" />
                   )}
                   <div>
-                    <div className="font-bold text-sm">
-                      STATUS: {scanResult.classification} — {scanResult.threat_category}
+                    <div className="font-bold text-sm flex items-center gap-2">
+                      <span className={isThreat ? "text-rose-300" : isUnknown ? "text-amber-300" : "text-emerald-300"}>
+                        STATUS: {isThreat ? "UNSAFE • THREAT DETECTED" : isUnknown ? "UNKNOWN" : "VERIFIED SAFE"}
+                      </span>
+                      {scanResult.threat_category && scanResult.threat_category !== "N/A" && (
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-black/50 border border-white/20 text-white font-mono">
+                          {scanResult.threat_category}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-[11px] opacity-80">
-                      Severity: <span className="uppercase font-bold">{scanResult.severity}</span> • SHA-256: {scanResult.sha256?.substring(0, 16)}...
+                    <div className="text-[11px] opacity-80 mt-0.5">
+                      Severity: <span className={`uppercase font-bold ${isThreat ? "text-rose-400" : ""}`}>{scanResult.severity}</span> • Risk Score: <span className="font-bold">{scanResult.risk_score || (isThreat ? 95 : 10)}/100</span> • SHA-256: {scanResult.sha256?.substring(0, 16)}...
                     </div>
                   </div>
                 </div>
 
-                <span className="text-xs px-2.5 py-1 rounded bg-black/40 font-bold border border-white/10">
-                  {scanResult.classification === "THREAT" ? "FLAGGED FOR MITIGATION" : "VERIFIED SAFE"}
+                <span className={`text-xs px-3 py-1.5 rounded font-mono font-bold tracking-wider border ${
+                  isThreat
+                    ? "bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/30"
+                    : isUnknown
+                    ? "bg-amber-600 text-white border-amber-400"
+                    : "bg-emerald-600 text-white border-emerald-400"
+                }`}>
+                  {isThreat ? "UNSAFE" : isUnknown ? "UNKNOWN" : "VERIFIED SAFE"}
                 </span>
               </div>
 
@@ -270,6 +296,7 @@ vssadmin.exe delete shadows /all /quiet
                 <div className="text-slate-400 text-[10px] font-bold uppercase">Detection Rationale:</div>
                 <p className="font-sans leading-relaxed">{scanResult.rationale}</p>
               </div>
+            
 
               {/* Deterministic Signals Flagged */}
               {scanResult.deterministic_signals && scanResult.deterministic_signals.length > 0 && (
@@ -299,7 +326,7 @@ vssadmin.exe delete shadows /all /quiet
               )}
 
               {/* Route to Threat Mitigation Action */}
-              {scanResult.classification === "THREAT" && (
+              {isThreat && (
                 <div className="pt-2">
                   <button
                     onClick={() => {
@@ -321,7 +348,9 @@ vssadmin.exe delete shadows /all /quiet
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
+
         </div>
       </div>
     </div>

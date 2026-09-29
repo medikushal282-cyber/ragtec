@@ -77,7 +77,14 @@ def get_events_for_device(device_id: str):
 
 @router.get("/events", response_model=List[SecurityEvent])
 def get_events():
-    return list(pipeline_instance.events.values())
+    rows = db_module.get_all_records("events")
+    results = []
+    for r in rows:
+        try:
+            results.append(SecurityEvent(**r))
+        except Exception:
+            pass
+    return results
 
 @router.post("/events", response_model=Optional[Incident])
 def submit_event(event: SecurityEvent):

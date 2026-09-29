@@ -40,8 +40,13 @@ app_log.txt
 # Monitored workspace test artifacts
 monitored_workspace/malware_simulation.exe
 
+# Nested Repositories
+Fraiday/
+
 # IDE & OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+

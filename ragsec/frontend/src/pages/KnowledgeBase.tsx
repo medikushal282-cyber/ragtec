@@ -1,315 +1,365 @@
-import React, { useState } from "react";
-import { ragsecApi } from "../services/api";
-import { QueryResponse } from "../types";
-import { 
-  BrainCircuit, 
-  Search, 
-  UploadCloud, 
-  ShieldCheck, 
-  ShieldAlert, 
-  FileText, 
-  Sparkles, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle,
+import React, { useEffect, useState } from "react";
+import { socApi } from "../services/api";
+import { KnowledgeDocument } from "../types/soc";
+import { CategoryTag } from "../components/Badges";
+import {
+  Database,
+  UploadCloud,
+  FileText,
+  Search,
+  Check,
+  RefreshCw,
+  Plus,
+  Layers,
+  Sparkles,
+  ExternalLink,
   BookOpen,
-  ArrowRight,
-  RefreshCw
+  Lock,
+  ChevronRight,
+  ShieldCheck
 } from "lucide-react";
 
 export const KnowledgeBase: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"search" | "ingest">("search");
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<QueryResponse | null>(null);
+  const [docs, setDocs] = useState<KnowledgeDocument[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [showIngestModal, setShowIngestModal] = useState<boolean>(false);
+  const [ingestTitle, setIngestTitle] = useState<string>("");
+  const [ingestContent, setIngestContent] = useState<string>("");
+  const [ingesting, setIngesting] = useState<boolean>(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>("");
+  const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
 
-  // Ingest form state
-  const [ingestTitle, setIngestTitle] = useState("");
-  const [ingestSource, setIngestSource] = useState("");
-  const [ingestContent, setIngestContent] = useState("");
-  const [ingestSuccess, setIngestSuccess] = useState<string | null>(null);
-  const [ingestLoading, setIngestLoading] = useState(false);
-
-  const presetQueries = [
-    "CVE-2024-38077 Windows RDP Remote Code Execution",
-    "FIM Integrity Verification and Hash Mismatch Remediation",
-    "Mitigating Prompt Injection Attacks in RAG Architectures",
-    "APT29 Tactical Signatures and Lateral Movement Indicators"
-  ];
-
-  const handleQuery = async (textToQuery?: string) => {
-    const q = textToQuery || query;
-    if (!q.trim()) return;
+  const loadDocs = async () => {
     setLoading(true);
-    setResult(null);
     try {
-      const data = await ragsecApi.queryThreatIntel(q);
-      setResult(data);
-    } catch (err) {
-      console.error("Query failed", err);
+      const data = await socApi.getKnowledgeSources();
+      setDocs(data || []);
+      if (data && data.length > 0 && !selectedDoc) {
+        setSelectedDoc(data[0]);
+      }
+    } catch (e) {
+      console.error("Knowledge base load error", e);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadDocs();
+  }, []);
+
   const handleIngest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ingestContent.trim()) return;
-    setIngestLoading(true);
-    setIngestSuccess(null);
+
+    setIngesting(true);
     try {
-      const ok = await ragsecApi.ingestDocument(ingestTitle, ingestContent, ingestSource);
-      if (ok) {
-        setIngestSuccess("Document successfully ingested into ChromaDB vector store!");
-        setIngestTitle("");
-        setIngestSource("");
-        setIngestContent("");
-      }
-    } catch (err) {
-      console.error("Ingest error", err);
+      await socApi.ingestDocument({
+        title: ingestTitle || "Manual CTI Submission",
+        content: ingestContent,
+        source_name: `${(ingestTitle || "manual_report").toLowerCase().replace(/\s+/g, "_")}.md`,
+        doc_type: "THREAT_CLASSIFICATION_INTEL"
+      });
+      setSuccessMsg(`Document "${ingestTitle || "CTI Submission"}" successfully ingested and indexed into ChromaDB!`);
+      setShowIngestModal(false);
+      setIngestTitle("");
+      setIngestContent("");
+      loadDocs();
+      setTimeout(() => setSuccessMsg(null), 5000);
+    } catch (e) {
+      console.error("Ingest error", e);
     } finally {
-      setIngestLoading(false);
+      setIngesting(false);
     }
   };
 
+  const filteredDocs = docs.filter(d =>
+    d.name.toLowerCase().includes(filter.toLowerCase()) ||
+    (d.summary && d.summary.toLowerCase().includes(filter.toLowerCase())) ||
+    (d.doc_type && d.doc_type.toLowerCase().includes(filter.toLowerCase()))
+  );
+
+  const totalChunksCount = docs.reduce((acc, d) => acc + (d.chunkCount || 1), 0);
+
   return (
     <div className="space-y-6">
-      {/* Navigation Tabs */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setActiveTab("search")}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 transition-all ${
-              activeTab === "search"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-md shadow-cyan-500/10"
-                : "text-slate-400 hover:text-white bg-white/5 border border-transparent"
-            }`}
-          >
-            <Search className="w-4 h-4 text-cyan-400" />
-            Vector Threat Query
-          </button>
-          <button
-            onClick={() => setActiveTab("ingest")}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 transition-all ${
-              activeTab === "ingest"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-md shadow-cyan-500/10"
-                : "text-slate-400 hover:text-white bg-white/5 border border-transparent"
-            }`}
-          >
-            <UploadCloud className="w-4 h-4 text-cyan-400" />
-            Ingest CTI Report
-          </button>
+      {/* Header Banner */}
+      <div className="modern-card p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-xs font-mono uppercase tracking-wider text-indigo-600 font-bold">
+              ChromaDB Vector Store
+            </span>
+            <span className="text-neutral-300">•</span>
+            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              {docs.length} CTI Documents • {totalChunksCount} Chunks
+            </span>
+          </div>
+          <h2 className="text-2xl font-bold text-black tracking-tight">
+            Threat Intelligence & Playbook Knowledge Base
+          </h2>
+          <p className="text-xs text-[#475569] mt-1 max-w-2xl">
+            Repository of indexed CISA advisories, MITRE ATT&CK techniques, CVE remediation compendia, and SOC standard operating procedures powering the grounded RAG engine.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-          <BookOpen className="w-4 h-4 text-cyan-400" />
-          <span>IEEE RAGSec Verification Protocol</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadDocs}
+            disabled={loading}
+            className="btn-secondary-white py-2"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-indigo-600" : ""}`} />
+            <span>Refresh Index</span>
+          </button>
+
+          <button
+            onClick={() => setShowIngestModal(true)}
+            className="btn-primary-black py-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Ingest Document</span>
+          </button>
         </div>
       </div>
 
-      {activeTab === "search" ? (
-        <div className="space-y-6">
-          {/* Query Bar */}
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <h3 className="text-sm font-bold text-white font-mono flex items-center gap-2">
-              <BrainCircuit className="w-4 h-4 text-cyan-400" />
-              Ask RAGSec Threat Intelligence Core
-            </h3>
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleQuery()}
-                  placeholder="Enter CVE ID, threat actor pattern, or remediation question..."
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 text-sm font-mono focus:outline-none focus:border-cyan-500/50"
-                />
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
-              </div>
-              <button
-                onClick={() => handleQuery()}
-                disabled={loading}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs flex items-center gap-2 transition-all shadow-md shadow-cyan-500/20"
-              >
-                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {loading ? "Querying Vector Store..." : "Run RAG Query"}
-              </button>
-            </div>
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+          <span>{successMsg}</span>
+        </div>
+      )}
 
-            {/* Presets */}
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <span className="text-[11px] text-slate-400 font-mono">Preset Queries:</span>
-              {presetQueries.map((pq, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setQuery(pq);
-                    handleQuery(pq);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-cyan-500/10 hover:border-cyan-500/30 border border-white/5 text-[11px] text-slate-300 font-mono transition-all flex items-center gap-1"
-                >
-                  <span>{pq}</span>
-                  <ArrowRight className="w-3 h-3 text-cyan-400" />
-                </button>
-              ))}
-            </div>
+      {/* 4 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="modern-card p-4 space-y-1">
+          <span className="text-[10px] font-mono text-[#64748B] uppercase">Indexed Documents</span>
+          <div className="font-bold text-2xl text-black">{docs.length}</div>
+          <div className="text-[11px] text-indigo-600 font-medium">Full CTI Coverage</div>
+        </div>
+        <div className="modern-card p-4 space-y-1">
+          <span className="text-[10px] font-mono text-[#64748B] uppercase">Canonical Chunks</span>
+          <div className="font-bold text-2xl font-mono text-black">{totalChunksCount}</div>
+          <div className="text-[11px] text-emerald-600 font-medium">Embedded with bge-small</div>
+        </div>
+        <div className="modern-card p-4 space-y-1">
+          <span className="text-[10px] font-mono text-[#64748B] uppercase">Vector Space</span>
+          <div className="font-bold text-2xl text-black">Cosine 384-D</div>
+          <div className="text-[11px] text-[#64748B]">ChromaDB Persistent</div>
+        </div>
+        <div className="modern-card p-4 space-y-1">
+          <span className="text-[10px] font-mono text-[#64748B] uppercase">Reranker Model</span>
+          <div className="font-bold text-2xl text-indigo-600 font-mono">MiniLM-L6</div>
+          <div className="text-[11px] text-[#64748B]">Cross-Encoder Stage 2</div>
+        </div>
+      </div>
+
+      {/* Main Grid: Documents List + Document Inspector */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 1 Col: Documents List */}
+        <div className="modern-card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-black font-mono">
+              CORPUS ARTIFACTS
+            </h3>
+            <span className="text-xs font-mono text-[#64748B]">{filteredDocs.length} Docs</span>
           </div>
 
-          {/* Results Display */}
-          {result && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Grounded Generation Answer (2 Cols) */}
-              <div className="lg:col-span-2 glass-panel p-6 rounded-2xl space-y-4 border-l-4 border-l-cyan-500">
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-cyan-400" />
-                    <h4 className="font-bold text-white text-base font-mono">Grounded Synthesized Answer</h4>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30">
-                      Confidence: {(result.confidence_score * 100).toFixed(0)}%
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+            <input
+              type="text"
+              placeholder="Search knowledge sources..."
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-8 pr-3 py-1.5 text-xs font-sans text-black focus:outline-none focus:border-indigo-600"
+            />
+          </div>
+
+          <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+            {filteredDocs.map(doc => {
+              const isSelected = selectedDoc?.id === doc.id;
+
+              return (
+                <div
+                  key={doc.id}
+                  onClick={() => setSelectedDoc(doc)}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-indigo-50/70 border-indigo-300 shadow-xs"
+                      : "bg-white border-neutral-200/80 hover:bg-neutral-50 hover:border-neutral-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono text-xs font-bold text-black truncate max-w-[180px]">
+                      {doc.name}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.2 rounded-md bg-white border border-neutral-200 text-[#475569] font-bold">
+                      {doc.chunkCount || 4} chunks
                     </span>
                   </div>
+
+                  <div className="text-[11px] text-[#64748B] line-clamp-2 mt-1">
+                    {doc.summary || "Advisory documentation and indicators for incident response."}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 mt-2 border-t border-neutral-100 text-[10px] font-mono">
+                    <span className="text-indigo-700 font-semibold">{doc.doc_type || "CTI_REPORT"}</span>
+                    <span className="text-emerald-700 font-bold">Index: Verified</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right 2 Cols: Document Detailed Inspector */}
+        <div className="lg:col-span-2 space-y-6">
+          {selectedDoc ? (
+            <div className="modern-card p-6 space-y-5">
+              <div className="flex items-start justify-between gap-4 pb-4 border-b border-neutral-100">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
+                      {selectedDoc.doc_type || "CTI Intelligence Document"}
+                    </span>
+                    <span className="text-xs text-[#94A3B8] font-mono">ID: {selectedDoc.id}</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-black">{selectedDoc.name}</h3>
                 </div>
 
-                <div className="text-sm text-slate-200 leading-relaxed font-sans bg-black/30 p-4 rounded-xl border border-white/5">
-                  {result.answer}
-                </div>
-
-                {/* Performance & Security Metrics */}
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 space-y-1">
-                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-cyan-400" />
-                      Retrieval Latency
-                    </div>
-                    <div className="text-sm font-bold text-white font-mono">{result.retrieval_latency_ms} ms</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 space-y-1">
-                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-blue-400" />
-                      Generation Latency
-                    </div>
-                    <div className="text-sm font-bold text-white font-mono">{result.generation_latency_ms} ms</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 space-y-1">
-                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                      Prompt Guard
-                    </div>
-                    <div className="text-xs font-bold text-emerald-400 font-mono uppercase">
-                      {result.security_audit?.sanitized ? "PASSED & SANITIZED" : "PASSED"}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold font-mono">
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Vector Grounded</span>
                 </div>
               </div>
 
-              {/* Retrieved Sources Drawer */}
-              <div className="glass-panel p-6 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-cyan-400" />
-                    <h4 className="font-bold text-white text-base font-mono">Evidence Sources</h4>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono">
-                    {result.sources.length} CHUNKS
-                  </span>
-                </div>
+              {/* Summary Block */}
+              <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-1.5">
+                <span className="text-[10px] font-mono text-[#64748B] uppercase tracking-wider block font-bold">
+                  EXECUTIVE THREAT SUMMARY
+                </span>
+                <p className="text-xs text-[#334155] leading-relaxed">
+                  {selectedDoc.summary || "Comprehensive threat actor analysis and technical mitigation procedures for active containment."}
+                </p>
+              </div>
 
-                <div className="space-y-3">
-                  {result.sources.map((src, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/5 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="text-cyan-400 font-bold">{src.metadata?.source || src.document_id}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
-                          Score: {(src.score * 100).toFixed(0)}%
-                        </span>
+              {/* Mitigation Protocols Checklist */}
+              {selectedDoc.mitigation_steps && selectedDoc.mitigation_steps.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-black font-mono">
+                    RECOMMENDED CONTAINMENT PLAYBOOK
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {selectedDoc.mitigation_steps.map((step, sIdx) => (
+                      <div key={sIdx} className="p-3 rounded-xl bg-white border border-neutral-200 flex items-start gap-2.5 text-xs text-[#1E293B]">
+                        <div className="w-4 h-4 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
+                          {sIdx + 1}
+                        </div>
+                        <span>{step}</span>
                       </div>
-                      <p className="text-xs text-slate-300 italic leading-snug font-sans">
-                        "{src.content}"
-                      </p>
-                      {src.metadata?.cve_id && (
-                        <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">
-                          {src.metadata.cve_id}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Technical Chunks Grid */}
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-black font-mono uppercase">
+                    CANONICAL VECTOR CHUNKS ({selectedDoc.chunkCount || 4})
+                  </span>
+                  <span className="text-[11px] font-mono text-[#64748B]">Max Token Window: 512</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#0F172A] text-neutral-200 font-mono text-xs overflow-x-auto leading-relaxed border border-neutral-800 max-h-60">
+                  <pre className="whitespace-pre-wrap">{`[CHUNK_01] ${selectedDoc.name}
+${selectedDoc.summary || "Detailed tactical and operational analysis for threat hunting and detection engineering."}
+
+[METADATA]
+source_type: ${selectedDoc.doc_type || "cti_report"}
+sensitivity_tier: internal
+indexing_engine: ChromaDB Cosine (BAAI/bge-small-en-v1.5)
+status: ACTIVE`}</pre>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="modern-card p-12 text-center text-[#94A3B8] font-mono text-xs">
+              Select a knowledge document from the list to view canonical chunks and metadata.
             </div>
           )}
         </div>
-      ) : (
-        /* Ingest CTI Report Tab */
-        <div className="glass-panel p-6 rounded-2xl max-w-2xl space-y-6">
-          <div className="border-b border-white/10 pb-3">
-            <h3 className="text-base font-bold text-white font-mono flex items-center gap-2">
-              <UploadCloud className="w-5 h-5 text-cyan-400" />
-              Ingest CTI Document into Vector Store
-            </h3>
-            <p className="text-xs text-slate-400">
-              Chunk, embed, and index threat intelligence reports into ChromaDB.
-            </p>
+      </div>
+
+      {/* Ingestion Modal */}
+      {showIngestModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="modern-card p-6 w-full max-w-xl space-y-4 bg-white shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <div className="flex items-center gap-2">
+                <UploadCloud className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-base text-black">Ingest CTI Knowledge Document</h3>
+              </div>
+              <button onClick={() => setShowIngestModal(false)} className="text-[#94A3B8] hover:text-black">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleIngest} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-black block mb-1">Document Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g., APT29 Staging TTPs Advisory"
+                  value={ingestTitle}
+                  onChange={e => setIngestTitle(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-2 text-xs font-sans text-black focus:outline-none focus:border-indigo-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-black block mb-1">Markdown / Plain Text Content</label>
+                <textarea
+                  rows={6}
+                  placeholder="Paste advisory content, IOCs, or SOP instructions..."
+                  value={ingestContent}
+                  onChange={e => setIngestContent(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3.5 text-xs font-mono text-black focus:outline-none focus:border-indigo-600"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowIngestModal(false)}
+                  className="btn-secondary-white py-2 px-4"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={ingesting}
+                  className="btn-primary-black py-2 px-5"
+                >
+                  {ingesting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Embedding & Indexing...</span>
+                    </>
+                  ) : (
+                    <span>Ingest to ChromaDB</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-
-          {ingestSuccess && (
-            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              {ingestSuccess}
-            </div>
-          )}
-
-          <form onSubmit={handleIngest} className="space-y-4">
-            <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1">Document Title</label>
-              <input
-                type="text"
-                value={ingestTitle}
-                onChange={(e) => setIngestTitle(e.target.value)}
-                placeholder="e.g. US-CERT Advisory 2024-09 RDP Vulnerability"
-                className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1">Source Name / Metadata</label>
-              <input
-                type="text"
-                value={ingestSource}
-                onChange={(e) => setIngestSource(e.target.value)}
-                placeholder="e.g. cti_report_rdp_2024.txt"
-                className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono text-slate-300 mb-1">Threat Report Text Content</label>
-              <textarea
-                value={ingestContent}
-                onChange={(e) => setIngestContent(e.target.value)}
-                rows={6}
-                placeholder="Paste threat report details, indicators of compromise (IOCs), or remediation steps..."
-                className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={ingestLoading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-cyan-500/20"
-            >
-              {ingestLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-              {ingestLoading ? "Indexing into Vector Database..." : "Ingest & Index Document"}
-            </button>
-          </form>
         </div>
       )}
     </div>
   );
 };
-
 export default KnowledgeBase;

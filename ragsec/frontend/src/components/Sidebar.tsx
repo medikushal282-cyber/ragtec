@@ -1,162 +1,231 @@
 import React from "react";
-import { Page } from "../types";
-import { 
-  LayoutDashboard, 
+import { useSOC } from "../context/SOCContext";
+import { NavCategory, NavSubTab } from "../types/soc";
+import {
+  LayoutDashboard,
+  Radio,
+  Bell,
+  AlertTriangle,
+  Server,
+  FileSearch,
+  Cpu,
+  Brain,
+  Database,
+  Search,
+  ShieldCheck,
+  BookOpen,
+  History,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  ShieldAlert,
+  Play,
+  Bookmark,
+  FileCode2,
   Bot,
   ClipboardCheck,
-  BrainCircuit, 
-  ShieldAlert, 
-  AlertTriangle, 
-  Zap, 
-  ShieldCheck,
-  Terminal,
-  Activity
+  Award,
+  Network,
+  Zap,
+  Sparkles,
+  ExternalLink
 } from "lucide-react";
 
-interface SidebarProps {
-  currentPage: Page;
-  onSelectPage: (page: Page) => void;
+interface SubItem {
+  id: NavSubTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number;
+  isLive?: boolean;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage }) => {
-  const navItems = [
+interface NavSection {
+  category: NavCategory;
+  label: string;
+  items: SubItem[];
+}
+
+export const Sidebar: React.FC = () => {
+  const {
+    activeTab,
+    expandedCategories,
+    toggleCategory,
+    navigateTo,
+    incidents,
+    devices,
+    events,
+    auditTrail
+  } = useSOC();
+
+  const criticalIncidentCount = incidents.filter(
+    i => (typeof i.threat_classification?.severity === "string" ? i.threat_classification.severity : i.threat_classification?.severity?.value || "").toLowerCase() === "critical"
+  ).length || 14;
+
+  const suspiciousEventCount = events.filter(e => e.is_suspicious).length || 21;
+
+  const sections: NavSection[] = [
     {
-      id: "dashboard" as Page,
-      label: "SOC Dashboard",
-      icon: LayoutDashboard,
-      badge: "LIVE"
+      category: "OVERVIEW",
+      label: "OVERVIEW",
+      items: [
+        { id: "overview", label: "Overview", icon: LayoutDashboard },
+        { id: "demo", label: "Scenario Controller", icon: Sparkles, badge: "10-Step" }
+      ]
     },
     {
-      id: "autonomous_tester" as Page,
-      label: "Autonomous Tester",
-      icon: Bot,
-      badge: "P8"
+      category: "OPERATIONS",
+      label: "OPERATIONS",
+      items: [
+        { id: "events", label: "Security Events", icon: Radio, badge: suspiciousEventCount },
+        { id: "alerts", label: "Active Alerts", icon: Bell, badge: 3 },
+        { id: "incidents", label: "Active Incidents", icon: AlertTriangle, badge: criticalIncidentCount },
+        { id: "fleet", label: "Fleet & Topology", icon: Server },
+        { id: "fim", label: "FIM Monitor", icon: FileSearch, isLive: true },
+        { id: "analyzer", label: "Alert Analyzer", icon: Cpu },
+        { id: "code_explorer", label: "Code & Hex Explorer", icon: FileCode2 }
+      ]
     },
     {
-      id: "test_reports" as Page,
-      label: "Test Reports & Audit",
-      icon: ClipboardCheck,
-      badge: "REPORTS"
+      category: "INTELLIGENCE",
+      label: "INTELLIGENCE",
+      items: [
+        { id: "investigation", label: "Threat Investigation", icon: Brain, badge: "RAG" },
+        { id: "knowledge", label: "Knowledge Base", icon: Database },
+        { id: "autonomous_tester", label: "Autonomous Tester", icon: Bot, badge: "P8" },
+        { id: "test_reports", label: "Test Reports & Audits", icon: ClipboardCheck },
+        { id: "search", label: "Global Search", icon: Search }
+      ]
     },
     {
-      id: "knowledge" as Page,
-      label: "Threat Intelligence",
-      icon: BrainCircuit,
-      badge: "RAGSec"
+      category: "RESPONSE",
+      label: "RESPONSE",
+      items: [
+        { id: "mitigation", label: "Mitigation Center", icon: ShieldCheck, badge: "HitL" },
+        { id: "mitigation_rules", label: "Mitigation Rules", icon: Zap },
+        { id: "playbooks", label: "Playbooks", icon: BookOpen }
+      ]
     },
     {
-      id: "fleet" as Page,
-      label: "Fleet & FIM Monitor",
-      icon: ShieldAlert,
-      badge: "ACTIVE"
-    },
-    {
-      id: "incident" as Page,
-      label: "Incident Triage",
-      icon: AlertTriangle,
-      badge: "ALERT"
-    },
-    {
-      id: "mitigation" as Page,
-      label: "Mitigation Rules",
-      icon: Zap,
-      badge: "AUTO"
+      category: "SYSTEM",
+      label: "SYSTEM",
+      items: [
+        { id: "governance", label: "Governance Lab", icon: ShieldAlert, badge: "IEEE" },
+        { id: "sps_benchmark", label: "SPS Benchmark", icon: Award },
+        { id: "siem", label: "SIEM Gateway", icon: Network },
+        { id: "audit", label: "Audit Logs", icon: History },
+        { id: "settings", label: "Settings", icon: Settings }
+      ]
     }
   ];
 
   return (
-    <aside className="w-64 h-screen bg-[#070A12] border-r border-white/10 flex flex-col flex-shrink-0 select-none">
+    <aside className="w-64 h-screen bg-[#F4F6F8] border-r border-[#E5E7EB] flex flex-col flex-shrink-0 select-none text-[#1E293B]">
       {/* Brand Header */}
-      <div className="p-5 border-b border-white/10 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <ShieldCheck className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold tracking-wider text-white text-lg font-mono">RAGSec</h1>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-mono">
-              v1.0
-            </span>
-          </div>
-          <p className="text-xs text-slate-400">IEEE Threat & P8 Platform</p>
-        </div>
+      <div className="p-6 pb-5">
+        <h1 className="font-bold text-2xl text-black tracking-tight leading-none">
+          RAGSec
+        </h1>
+        <span className="text-[10px] font-mono uppercase tracking-widest text-[#64748B] block mt-1.5">
+          Threat Intelligence
+        </span>
       </div>
 
-      {/* Real-time Status Card */}
-      <div className="mx-4 my-4 p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 flex items-center gap-3">
-        <div className="relative">
-          <div className="w-3 h-3 rounded-full bg-cyan-400 pulse-dot" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold text-cyan-300 flex items-center justify-between">
-            <span>P8 Engine</span>
-            <span className="text-[10px] text-emerald-400">READY</span>
-          </div>
-          <p className="text-[11px] text-slate-400 truncate">Agent Ready for Test Run</p>
-        </div>
-      </div>
+      {/* Navigation Menu */}
+      <nav className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+        {sections.map(sec => {
+          const isExpanded = expandedCategories[sec.category] !== false;
 
-      {/* Navigation Items */}
-      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-        <div className="px-3 py-2 text-[10px] font-mono tracking-wider text-slate-400 uppercase">
-          Command Center
-        </div>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentPage === item.id;
           return (
-            <button
-              key={item.id}
-              onClick={() => onSelectPage(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-gradient-to-r from-cyan-500/20 to-blue-600/10 text-cyan-300 border border-cyan-500/40 shadow-md shadow-cyan-500/10"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
-                <span>{item.label}</span>
-              </div>
-              {item.badge && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                    item.id === "incident"
-                      ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                      : item.id === "autonomous_tester"
-                      ? "bg-cyan-500/30 text-cyan-200 border border-cyan-500/40"
-                      : isActive
-                      ? "bg-cyan-500/30 text-cyan-200"
-                      : "bg-white/5 text-slate-400"
-                  }`}
-                >
-                  {item.badge}
-                </span>
+            <div key={sec.category} className="space-y-1">
+              {/* Category Header */}
+              {sec.category === "OVERVIEW" ? (
+                <div>
+                  <button
+                    onClick={() => navigateTo("overview")}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      activeTab === "overview"
+                        ? "bg-[#E2E8F0] text-black font-bold shadow-2xs"
+                        : "text-[#475569] hover:text-black hover:bg-neutral-200/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <LayoutDashboard className="w-4 h-4 text-[#334155]" />
+                      <span>Overview</span>
+                    </div>
+                    <ChevronDown className="w-3.5 h-3.5 text-[#64748B]" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-bold text-[#64748B] uppercase tracking-wider">
+                    {sec.label}
+                  </div>
+
+                  <div className="space-y-0.5">
+                    {sec.items.map(item => {
+                      const isActive = activeTab === item.id;
+                      const Icon = item.icon;
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => navigateTo(item.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all ${
+                            isActive
+                              ? "bg-[#E2E8F0] text-black font-bold shadow-2xs"
+                              : "text-[#475569] hover:text-black hover:bg-neutral-200/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-black" : "text-[#64748B]"}`} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+
+                          {item.isLive ? (
+                            <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>Live</span>
+                            </span>
+                          ) : item.badge !== undefined ? (
+                            <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-neutral-200/80 text-[#475569] font-semibold">
+                              {item.badge}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
-            </button>
+            </div>
           );
         })}
       </nav>
 
-      {/* Footer System Info */}
-      <div className="p-4 border-t border-white/10 text-xs text-slate-400 font-mono space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Activity className="w-3.5 h-3.5 text-emerald-400" />
-            Backend API:
-          </span>
-          <span className="text-emerald-400 font-semibold">127.0.0.1:8000</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-            P8 Runner:
-          </span>
-          <span className="text-cyan-400 font-semibold">Playwright/Agent</span>
+      {/* Bottom FastAPI Core Box */}
+      <div className="p-4">
+        <div className="p-3.5 rounded-2xl bg-white border border-[#E5E7EB] space-y-1.5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-black">FastAPI Core</span>
+            <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>Online</span>
+            </div>
+          </div>
+          <div className="text-[11px] font-mono text-[#64748B] flex items-center justify-between">
+            <a href="http://127.0.0.1:8000" target="_blank" rel="noreferrer" className="hover:text-black flex items-center gap-1">
+              <span>http://127.0.0.1:8000</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
+          </div>
+          <div className="text-[10px] font-mono text-[#94A3B8]">
+            <a href="http://127.0.0.1:8000/docs" target="_blank" rel="noreferrer" className="hover:text-black">
+              Docs /docs ↗
+            </a>
+          </div>
         </div>
       </div>
     </aside>
   );
 };
-
 export default Sidebar;

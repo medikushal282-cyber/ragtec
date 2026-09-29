@@ -158,17 +158,23 @@ def quarantine_file(req: QuarantineReq):
         if not evt or not isinstance(evt, dict):
             continue
         evt_canonical = evt.get("canonical") or {}
-        evt_path = evt_canonical.get("file_path", "") if isinstance(evt_canonical, dict) else ""
+        evt_path = str(evt_canonical.get("file_path") or "") if isinstance(evt_canonical, dict) else ""
         evt_name = os.path.basename(evt_path) if evt_path else ""
         evt_id = evt.get("id")
         
+        target_path_str = str(target_path or "").lower()
+        resolved_path_str = str(resolved_path or "").lower()
+        filename_str = str(filename or "").lower()
+        evt_path_str = evt_path.lower()
+        evt_name_str = evt_name.lower()
+
         matches = (
             (target_event_id and evt_id == target_event_id) or
-            (target_path and (
-                evt_name.lower() == filename.lower() or 
-                evt_path.lower() == target_path.lower() or 
-                evt_path.lower() == resolved_path.lower() or 
-                filename.lower() in evt_path.lower()
+            (target_path_str and (
+                evt_name_str == filename_str or 
+                evt_path_str == target_path_str or 
+                evt_path_str == resolved_path_str or 
+                (filename_str and filename_str in evt_path_str)
             ))
         )
         if matches:
@@ -246,8 +252,8 @@ def restore_file(req: RestoreReq):
         if not evt or not isinstance(evt, dict):
             continue
         c = evt.get("canonical") or {}
-        evt_path = c.get("file_path", "")
-        if os.path.basename(evt_path) == filename or evt_path == o_path:
+        evt_path = str(c.get("file_path") or "")
+        if os.path.basename(evt_path).lower() == filename.lower() or evt_path.lower() == str(o_path).lower():
             evt["status"] = "RESTORED"
             if isinstance(c, dict):
                 c["is_quarantined"] = False
@@ -255,6 +261,7 @@ def restore_file(req: RestoreReq):
                 evt["canonical"] = c
             if evt.get("id"):
                 save_record("events", evt["id"], evt)
+
 
     # Log audit
     audit_service.log_event(
@@ -379,3 +386,42 @@ def trigger_scan():
     workspace_dir = get_workspace_dir()
     res = scan_workspace(workspace_dir)
     return {"status": "COMPLETED", "workspace": workspace_dir, **res}
+
+class ThreatSimReq(BaseModel):
+    filename: Optional[str] = "trojan_dropper_simulation.ps1"
+    threat_type: Optional[str] = "Suspicious Script / Execution"
+
+@router.post("/simulate_threat")
+def simulate_threat_incident(req: ThreatSimReq):
+    workspace_dir = get_workspace_dir()
+    os.makedirs(workspace_dir, exist_ok=True)
+    
+    target_filename = req.filename or "trojan_dropper_simulation.ps1"
+    filepath = os.path.join(workspace_dir, target_filename)
+    
+    # Write safe simulated test payload with realistic indicators (encoded payload, vssadmin, C2 beacon string)
+    test_content = (
+        "# [RAGSEC SIMULATED SECURITY TEST ARTIFACT]\n"
+        "# MITRE ATT&CK: T1059.001 (PowerShell), T1490 (Inhibit System Recovery), T1071 (C2 Channel)\n"
+        "$enc_payload = 'JABzAHIAYwAgAD0AIAA... (Simulated Base64 Dropper)'\n"
+        "Write-Host '[TEST] Initiating simulated adversary staging...'\n"
+        "vssadmin delete shadows /all /quiet\n"
+        "$c2 = 'http://185.220.101.5:443/beacon.ps1'\n"
+        "Write-Host '[TEST] Staging simulated payload for RAGSec FIM verification.'\n"
+    )
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(test_content)
+        
+    # Generate FIM event and incident
+    from ingestion.fim.scanner import generate_fim_event
+    event = generate_fim_event(filepath, "CREATED")
+    
+    return {
+        "status": "SUCCESS",
+        "message": f"Simulated test threat artifact '{target_filename}' created in monitored workspace.",
+        "filepath": filepath,
+        "event_id": event.id if hasattr(event, "id") else None,
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
+    }
+

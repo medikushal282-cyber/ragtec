@@ -155,6 +155,18 @@ export const socApi = {
     });
   },
 
+  async getQuarantinedFiles(): Promise<any[]> {
+    return request<any[]>("/api/fim/quarantined", { method: "GET" }, []);
+  },
+
+  async simulateThreat(filename?: string, threatType?: string): Promise<any> {
+    return request<any>("/api/fim/simulate_threat", {
+      method: "POST",
+      body: JSON.stringify({ filename, threat_type: threatType })
+    });
+  },
+
+
   // --- Static & AI Analysis (Safe - Never Executes) ---
   async analyzeFile(filename: string, contentB64: string, eventId?: string, incidentId?: string): Promise<StaticAnalysisResult> {
     return request<StaticAnalysisResult>("/api/analysis/analyze", {

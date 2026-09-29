@@ -15,11 +15,16 @@ from dataclasses import dataclass, field
 # Severity weights: 1=low, 2=medium, 3=high
 # ---------------------------------------------------------------------------
 _BEHAVIORAL_RULES: List[Tuple[str, str, int]] = [
-    # Ransomware / Destructive
+    # Ransomware / Destructive / Extortion
     (r"(?i)del\s+/[fqs].*\*|rmdir\s+/s|remove-item.*-recurse", "Destructive file deletion loop", 3),
     (r"(?i)vssadmin.*delete|wmic.*shadowcopy.*delete", "Shadow copy deletion (ransomware indicator)", 3),
     (r"(?i)(for|foreach).*\.(doc|docx|xls|xlsx|pdf|jpg|png|mp4|db).*encrypt|ren.*\.crypted", "Mass file encryption loop", 3),
     (r"(?i)open\([^)]+['\"]wb['\"]\).*\bfor\b|\bwith open\b.*for.*in os\.walk", "Mass file write loop (ransomware-like)", 2),
+    (r"(?i)files\s+have\s+been\s+encrypted|contact.*decrypt|onion\.mail|\.raglock|\.crypted|blacksuit|lockbit", "Ransom Note / Cryptographic Extortion Indicator", 3),
+
+    # Web Shell / Backdoor Execution
+    (r"(?i)eval\s*\(\s*base64_decode|passthru\s*\(|shell_exec\s*\(|system\s*\(\s*\$|assert\s*\(\s*\$", "Web Shell / Dynamic Code Execution Backdoor", 3),
+    (r"(?i)\$_POST\[|\$_GET\[|\$_REQUEST\[", "Web Input Command Handler (Web shell indicator)", 2),
 
     # Unbounded process spawning (Malware / DoS)
     (r"(?i)^:loop\b|goto\s+loop", "Unbounded goto-loop (process spawning risk)", 2),
@@ -31,7 +36,7 @@ _BEHAVIORAL_RULES: List[Tuple[str, str, int]] = [
     (r"(?i)-enc(odedcommand)?[\s]+[A-Za-z0-9+/]{20,}={0,2}", "Base64-encoded PowerShell command", 3),
     (r"(?i)\[System\.Convert\]::FromBase64String|base64\.b64decode", "Runtime base64 decode (obfuscation)", 2),
     (r"(?i)certutil.*-decode|certutil.*-urlcache", "certutil misuse for payload decode/download", 3),
-    (r"(?i)iex\s*\(|invoke-expression\s*\(", "IEX / Invoke-Expression (code injection risk)", 3),
+    (r"(?i)iex\s*\(|invoke-expression\s*\(|\binvoke-expression\b", "IEX / Invoke-Expression (code injection risk)", 3),
 
     # Payload retrieval / C2
     (r"(?i)(wget|curl|Invoke-WebRequest|DownloadString|DownloadFile)\s+['\"]?https?://", "Payload download from remote URL", 3),
@@ -39,10 +44,14 @@ _BEHAVIORAL_RULES: List[Tuple[str, str, int]] = [
     (r"(?i)(nc|ncat|netcat)\s+-[eluvw]|\bsocat\b", "Reverse shell utility usage", 3),
     (r"(?i)schtasks.*/create|reg\s+add.*\\run|HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", "Persistence via scheduled task or registry Run key", 3),
 
+    # Process Injection / Binary PE APIs
+    (r"(?i)VirtualAlloc|CreateRemoteThread|WriteProcessMemory", "PE Process Injection / Shellcode Execution API", 3),
+
     # Credential collection
-    (r"(?i)(mimikatz|sekurlsa|lsass|procdump.*lsass)", "LSASS / credential dumping indicator", 3),
+    (r"(?i)(mimikatz|sekurlsa|lsass|procdump.*lsass|DumpCreds)", "LSASS / credential dumping indicator", 3),
     (r"(?i)Get-Credential|$env:USERNAME.*password|ConvertTo-SecureString", "Credential collection in script", 2),
     (r"(?i)net\s+user\s+\w+\s+\w+\s*/add|net\s+localgroup\s+administrators.*add", "Unauthorized user creation", 3),
+
 
     # Self-replication / spreading
     (r"(?i)shutil\.copy.*__file__|copy\s+%0\s+|\bfor\b.*\brobocopy\b.*%0", "Self-replication: script copies itself", 3),

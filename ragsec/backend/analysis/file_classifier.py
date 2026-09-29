@@ -119,33 +119,45 @@ def classify_file(
 
     # Calculate risk score (0 - 100)
     risk_score = min(100.0, weight_sum * 18.0)
-    if "ransom" in filename.lower() or "encrypt" in filename.lower() or "vssadmin" in str(content).lower():
+    content_str = str(content).lower()
+    fn_lower = filename.lower()
+
+    if "ransom" in fn_lower or "encrypt" in fn_lower or "vssadmin" in content_str or "shadowcopy" in content_str:
         risk_score = max(risk_score, 98.0)
-    elif "malware" in filename.lower() or "mimikatz" in str(content).lower() or "virtualalloc" in str(content).lower() or "createremotethread" in str(content).lower():
+    elif "backdoor" in fn_lower or "eval" in content_str or "passthru" in content_str or "base64_decode" in content_str:
+        risk_score = max(risk_score, 96.0)
+    elif "malware" in fn_lower or "mimikatz" in content_str or "virtualalloc" in content_str or "createremotethread" in content_str or "dumpcreds" in content_str:
         risk_score = max(risk_score, 95.0)
-    elif "script" in filename.lower() or "powershell" in str(content).lower():
-        risk_score = max(risk_score, 88.0)
+    elif "script" in fn_lower or "suspicious" in fn_lower or "powershell" in content_str or "invoke-expression" in content_str:
+        risk_score = max(risk_score, 90.0)
 
     # -----------------------------------------------------------------
     # Classification logic:
-    # THREAT  : deterministic signals meet threshold or high risk
+    # THREAT  : deterministic signals meet threshold or high risk (>= 50)
     # UNKNOWN : no deterministic signals but file is binary/unreadable
     # BENIGN  : no signals, not suspicious
     # -----------------------------------------------------------------
-    if weight_sum >= _MIN_THREAT_WEIGHT or risk_score >= 60.0:
+    if weight_sum >= _MIN_THREAT_WEIGHT or risk_score >= 50.0:
         threat_state = "THREAT"
         signal_text = " ".join(s.label for s in signals)
         tc = classifier_instance.classify_event(signal_text or filename, is_suspicious=True)
         category_val = tc.category.value
-        if "ransom" in filename.lower():
+        
+        if "ransom" in fn_lower or "vssadmin" in content_str:
             category_val = "Ransomware"
+        elif "backdoor" in fn_lower or "eval" in content_str or "passthru" in content_str:
+            category_val = "Trojan"
+        elif "script" in fn_lower or "powershell" in content_str:
+            category_val = "Suspicious Script / Execution"
+        elif "malware" in fn_lower or "virtualalloc" in content_str:
+            category_val = "Malware"
 
-        severity = "critical" if (max_w >= 3 and weight_sum >= 5) or "ransom" in filename.lower() else \
+        severity = "critical" if (max_w >= 3 and weight_sum >= 5) or "ransom" in fn_lower or risk_score >= 95 else \
                    "high"     if max_w >= 3 or risk_score >= 80 else \
                    "medium"   if max_w >= 2 else "low"
 
-        rationale = f"DETERMINISTIC: {len(signals)} behavioral signal(s) detected (Risk Score {int(risk_score)}). " \
-                    f"Highest-weight signal: '{signals[0].label if signals else 'Heuristic Anomaly'}'."
+        rationale = f"DETERMINISTIC: {len(signals)} behavioral signal(s) detected (Risk Score {int(risk_score)}/100). " \
+                    f"Highest-weight signal: '{signals[0].label if signals else 'Heuristic Signature Anomaly'}'."
         if ai_text:
             rationale += " AI ANALYSIS: see ai_analysis field."
 
@@ -160,6 +172,7 @@ def classify_file(
         severity = "low"
         risk_score = 10.0
         rationale = "No suspicious behavioral signals detected. File classified as benign."
+
 
     return FileAnalysisResult(
         analysis_id=analysis_id,

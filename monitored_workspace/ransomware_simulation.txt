@@ -1,5 +1,4 @@
-WARNING: All your enterprise files have been encrypted using AES-256 and RSA-4096.
-Command executed: vssadmin delete shadows /all /quiet
-wmic shadowcopy delete
-Do not restart your computer or attempt recovery.
-Contact key recovery: blacksuit_decryptor@onion.mail
+[SIMULATED_ATTACK_TELEMETRY] 
+Timestamp: 29-09-2026 15:32:36.73 
+MITRE ATT&CK: T1486 Data Encrypted for Impact 
+IOC: .raglock extension signature 

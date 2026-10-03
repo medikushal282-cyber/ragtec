@@ -310,3 +310,47 @@ def get_analysis(analysis_id: str):
 def list_recent_analyses(limit: int = 20):
     """List most recent file analyses."""
     return list_file_analyses(limit=min(limit, 100))
+
+
+class GroqWorkspaceScanRequest(BaseModel):
+    api_key: Optional[str] = None
+    model: Optional[str] = "llama-3.3-70b-versatile"
+    workspace_dir: Optional[str] = None
+    use_tools: bool = True
+
+@router.post("/scan-workspace-groq")
+def scan_workspace_with_groq(req: GroqWorkspaceScanRequest):
+    """
+    Executes deep threat detection on all files in the space using Groq LLMs + tool calling.
+    Declares if each file is UNSAFE (threat) or SAFE, with severity, risk score, and playbooks.
+    """
+    from analysis.groq_threat_agent import scan_workspace_with_groq_agent
+    res = scan_workspace_with_groq_agent(
+        workspace_dir=req.workspace_dir,
+        api_key=req.api_key,
+        model=req.model,
+        use_tools=req.use_tools
+    )
+    return res
+
+
+class GroqFileAnalysisRequest(BaseModel):
+    file_path: str
+    api_key: Optional[str] = None
+    model: Optional[str] = "llama-3.3-70b-versatile"
+    use_tools: bool = True
+
+@router.post("/analyze-file-groq")
+def analyze_single_file_with_groq_endpoint(req: GroqFileAnalysisRequest):
+    """
+    Analyzes an individual file using the Groq AI Threat Agent with tools.
+    """
+    from analysis.groq_threat_agent import analyze_single_file_with_groq
+    res = analyze_single_file_with_groq(
+        filepath=req.file_path,
+        api_key=req.api_key,
+        model=req.model,
+        use_tools=req.use_tools
+    )
+    return res
+

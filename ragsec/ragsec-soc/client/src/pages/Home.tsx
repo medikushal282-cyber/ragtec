@@ -28,7 +28,9 @@ import {
   Sparkles,
   ExternalLink,
   BookOpen,
-  GraduationCap
+  Server,
+  FolderOpen,
+  FolderSync
 } from "lucide-react";
 
 import { DemoControlPanel } from "../components/DemoControlPanel";
@@ -46,14 +48,12 @@ import { SPSBenchmarkView } from "../components/SPSBenchmarkView";
 import { SiemGatewayView } from "../components/SiemGatewayView";
 import { GovernanceLabView } from "../components/GovernanceLabView";
 import { ActiveThreatReplicatorView } from "../components/ActiveThreatReplicatorView";
-import { ReviewDefenseHubView } from "../components/ReviewDefenseHubView";
 import { Award, Network, Fingerprint, MessageSquare } from "lucide-react";
 import { SYNTHETIC_DEMO_ARTIFACTS, DemoScenarioArtifact } from "../services/demoEngine";
 import { FileCRUDEvent, ThreatCategory } from "../types";
 
 type Page = 
   | "dashboard"
-  | "review_defense"
   | "active_threats"
   | "ai_chat"
   | "mitigation"
@@ -97,6 +97,24 @@ export default function Home() {
 
   // Selected Artifact for Code Explorer
   const [selectedArtifact, setSelectedArtifact] = useState<DemoScenarioArtifact | null>(null);
+
+  // Selected Threat passed directly to Threat Mitigation
+  const [selectedThreatForMitigation, setSelectedThreatForMitigation] = useState<{
+    fileName: string;
+    filePath: string;
+    category?: string;
+    threatStatus?: string;
+    reasons?: string[];
+    evidence?: string[];
+  } | null>(null);
+
+  // Monitored Devices Telemetry State
+  const [monitoredDevices, setMonitoredDevices] = useState<any[]>([
+    { id: "dev-01", hostname: "FINANCE-PC-014", ip_address: "10.24.8.42", os_type: "Windows 11 Enterprise", status: "Active", criticality: "HIGH" },
+    { id: "dev-02", hostname: "DMZ-WEB-03", ip_address: "192.168.1.10", os_type: "Debian 12 / Nginx", status: "Active", criticality: "CRITICAL" },
+    { id: "dev-03", hostname: "ENG-LT-019", ip_address: "10.24.1.19", os_type: "macOS Sonoma 14.5", status: "Active", criticality: "MEDIUM" },
+    { id: "dev-04", hostname: "CORP-DC-01", ip_address: "10.0.0.2", os_type: "Windows Server 2022", status: "Active", criticality: "CRITICAL" }
+  ]);
 
   // Live CRUD Events Log Stream
   const [crudEvents, setCrudEvents] = useState<FileCRUDEvent[]>([
@@ -278,15 +296,29 @@ export default function Home() {
     }
   };
 
+  const fetchDevices = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/soc/devices`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d && Array.isArray(d) && d.length > 0) {
+          setMonitoredDevices(d);
+        }
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     checkHealth();
     fetchDashboardStats();
     fetchFimEvents();
+    fetchDevices();
 
     const interval = setInterval(() => {
       checkHealth();
       fetchDashboardStats();
       fetchFimEvents();
+      fetchDevices();
     }, 4000);
 
     return () => clearInterval(interval);
@@ -442,7 +474,6 @@ export default function Home() {
   ];
 
   const researchNavItems = [
-    { id: "review_defense" as Page, label: "SDC-II Review Defense Hub", icon: GraduationCap, badge: "DR. TVG" },
     { id: "sps_benchmark" as Page, label: "SPS & Evaluation Lab", icon: Award, badge: "IEEE VIII" },
     { id: "siem_gateway" as Page, label: "SIEM & Ticketing Gateway", icon: Network, badge: "GATEWAY" },
     { id: "governance_lab" as Page, label: "Governance & CRC Defense", icon: Fingerprint, badge: "CRC" },
@@ -695,29 +726,78 @@ export default function Home() {
                   onTriggerScenario={handleTriggerScenario}
                 />
 
-                {/* Dr. TVG Sridevi SDC-II Review Defense Fast-Launch Banner */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-[#0B0F19] to-amber-950/40 border border-indigo-500/40 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-indigo-950/30">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center flex-shrink-0">
-                      <GraduationCap className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white font-sans">SDC-II Review Defense Hub</h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">DR. TVG SRIDEVI EVALUATION READY</span>
+                {/* Endpoint Fleet & Monitored Directory Live Card */}
+                <div className="glass-panel p-5 rounded-2xl border border-white/10 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center flex-shrink-0">
+                        <Server className="w-5 h-5 text-cyan-400" />
                       </div>
-                      <p className="text-[11px] text-slate-400">
-                        12-point rubric aligned defense: Base Paper comparisons, Tech justifications, Team member contribution matrix, and Viva Q&amp;A simulator.
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-white font-mono">Monitored Fleet Devices & Directory</h4>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            FIM SURVEILLANCE ACTIVE
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                          Surveillance root: <code className="text-cyan-300 font-bold">monitored_workspace/</code> • Real-time Watchdog event interception
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage("fleet")}
+                        className="px-3.5 py-1.5 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                      >
+                        <Server className="w-3.5 h-3.5" />
+                        Manage Fleet ({monitoredDevices.length})
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage("file_scanner")}
+                        className="px-3.5 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                      >
+                        <FileSearch className="w-3.5 h-3.5" />
+                        Scan Directory
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setCurrentPage("review_defense")}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-indigo-600/30 flex-shrink-0"
-                  >
-                    Launch Defense Hub
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+
+                  {/* Devices List Quick Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {monitoredDevices.map((dev: any) => (
+                      <div
+                        key={dev.id}
+                        onClick={() => setCurrentPage("fleet")}
+                        className="p-3 rounded-xl bg-black/40 border border-white/5 hover:border-cyan-500/40 transition-all cursor-pointer group space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white font-mono group-hover:text-cyan-300 transition-colors">
+                            {dev.hostname}
+                          </span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                            dev.criticality === "CRITICAL" ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" :
+                            dev.criticality === "HIGH" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
+                            "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                          }`}>
+                            {dev.criticality}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
+                          <span>{dev.ip_address}</span>
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            {dev.status}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate">
+                          {dev.os_type}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Active Replicator Sentinel Interactive Banner */}
@@ -918,6 +998,26 @@ export default function Home() {
                             <div className="text-[10px] text-slate-400 mt-1">Confidence: {evt.confidence || 95}%</div>
                           </div>
 
+                          {/* Mitigate Threat Button */}
+                          <button
+                            onClick={() => {
+                              setSelectedThreatForMitigation({
+                                fileName: evt.file_name,
+                                filePath: evt.file_path,
+                                category: evt.category,
+                                threatStatus: evt.threat_status,
+                                reasons: evt.reasons,
+                                evidence: evt.evidence
+                              });
+                              setCurrentPage("mitigation");
+                            }}
+                            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                            title="Mitigate this flagged threat with AI playbooks & scripts"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                            Mitigate Threat
+                          </button>
+
                           <button
                             onClick={() => {
                               const art: DemoScenarioArtifact = {
@@ -956,12 +1056,22 @@ export default function Home() {
                           </button>
 
                           <button
-                            onClick={() => setCurrentPage("ai_chat")}
+                            onClick={() => {
+                              setSelectedThreatForMitigation({
+                                fileName: evt.file_name,
+                                filePath: evt.file_path,
+                                category: evt.category,
+                                threatStatus: evt.threat_status,
+                                reasons: evt.reasons,
+                                evidence: evt.evidence
+                              });
+                              setCurrentPage("mitigation");
+                            }}
                             className="px-3 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
-                            title="Investigate this threat in AI Copilot"
+                            title="Ask AI Copilot how to mitigate this threat"
                           >
                             <Bot className="w-3.5 h-3.5 text-cyan-400" />
-                            Ask AI Copilot
+                            Ask AI
                           </button>
                         </div>
                       </div>
@@ -971,17 +1081,15 @@ export default function Home() {
               </div>
             )}
 
-            {currentPage === "review_defense" && (
-              <ReviewDefenseHubView onNavigate={(p) => setCurrentPage(p as Page)} />
-            )}
-
             {currentPage === "active_threats" && (
               <ActiveThreatReplicatorView onNavigate={(p) => setCurrentPage(p as Page)} />
             )}
 
             {currentPage === "ai_chat" && <AICopilotView />}
 
-            {currentPage === "mitigation" && <MitigationRulesView />}
+            {currentPage === "mitigation" && (
+              <MitigationRulesView initialThreat={selectedThreatForMitigation} />
+            )}
 
             {currentPage === "knowledge" && <KnowledgeBaseView />}
 

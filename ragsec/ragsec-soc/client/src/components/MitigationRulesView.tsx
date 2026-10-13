@@ -73,7 +73,18 @@ interface DiscoveredModel {
   command?: string;
 }
 
-export const MitigationRulesView: React.FC = () => {
+export interface MitigationRulesViewProps {
+  initialThreat?: {
+    fileName: string;
+    filePath: string;
+    category?: string;
+    threatStatus?: string;
+    reasons?: string[];
+    evidence?: string[];
+  } | null;
+}
+
+export const MitigationRulesView: React.FC<MitigationRulesViewProps> = ({ initialThreat }) => {
   const [activeSubtab, setActiveSubtab] = useState<"PLAYBOOKS" | "CHATBOT" | "SYNTHESIZER">("CHATBOT");
 
   // Playbooks queue state
@@ -202,6 +213,24 @@ You can chat with me directly using **Groq API**, **OpenRouter API**, **Local Ol
   useEffect(() => {
     localStorage.setItem("ragsec_model_name", customModel);
   }, [customModel]);
+
+  useEffect(() => {
+    if (initialThreat) {
+      setActiveSubtab("CHATBOT");
+      const threatMsg: ChatMessage = {
+        id: `threat-${Date.now()}`,
+        role: "assistant",
+        content: `🚨 **Threat Investigation Loaded**: \`${initialThreat.fileName}\`\n\n- **File Path**: \`${initialThreat.filePath}\`\n- **Detected Category**: **${initialThreat.category || "Suspicious Threat"}**\n- **Status**: \`${initialThreat.threatStatus || "SUSPICIOUS"}\`\n${initialThreat.reasons && initialThreat.reasons.length > 0 ? `- **Primary Reason**: ${initialThreat.reasons.join(", ")}\n` : ""}${initialThreat.evidence && initialThreat.evidence.length > 0 ? `- **Forensic Evidence**: ${initialThreat.evidence.join("; ")}\n` : ""}\nHow would you like to mitigate this threat? I can generate PowerShell/Bash isolation commands, remove the malicious artifact to \`.quarantine\`, or analyze if it is genuinely harmful.`,
+        timestamp: new Date().toLocaleTimeString(),
+        provider: "RAGSec Threat Sentinel",
+        model: "Threat Investigator"
+      };
+      setMessages((prev) => [threatMsg, ...prev]);
+      if (initialThreat.category) setSynthCategory(initialThreat.category);
+      if (initialThreat.fileName) setSynthFile(initialThreat.fileName);
+      setInputQuery(`How do I mitigate and safely isolate ${initialThreat.fileName} if it is harmful?`);
+    }
+  }, [initialThreat]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });

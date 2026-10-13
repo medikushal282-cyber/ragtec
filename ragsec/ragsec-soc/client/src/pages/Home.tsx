@@ -27,7 +27,8 @@ import {
   X,
   Sparkles,
   ExternalLink,
-  BookOpen
+  BookOpen,
+  GraduationCap
 } from "lucide-react";
 
 import { DemoControlPanel } from "../components/DemoControlPanel";
@@ -45,12 +46,14 @@ import { SPSBenchmarkView } from "../components/SPSBenchmarkView";
 import { SiemGatewayView } from "../components/SiemGatewayView";
 import { GovernanceLabView } from "../components/GovernanceLabView";
 import { ActiveThreatReplicatorView } from "../components/ActiveThreatReplicatorView";
+import { ReviewDefenseHubView } from "../components/ReviewDefenseHubView";
 import { Award, Network, Fingerprint, MessageSquare } from "lucide-react";
 import { SYNTHETIC_DEMO_ARTIFACTS, DemoScenarioArtifact } from "../services/demoEngine";
 import { FileCRUDEvent, ThreatCategory } from "../types";
 
 type Page = 
   | "dashboard"
+  | "review_defense"
   | "active_threats"
   | "ai_chat"
   | "mitigation"
@@ -439,6 +442,7 @@ export default function Home() {
   ];
 
   const researchNavItems = [
+    { id: "review_defense" as Page, label: "SDC-II Review Defense Hub", icon: GraduationCap, badge: "DR. TVG" },
     { id: "sps_benchmark" as Page, label: "SPS & Evaluation Lab", icon: Award, badge: "IEEE VIII" },
     { id: "siem_gateway" as Page, label: "SIEM & Ticketing Gateway", icon: Network, badge: "GATEWAY" },
     { id: "governance_lab" as Page, label: "Governance & CRC Defense", icon: Fingerprint, badge: "CRC" },
@@ -691,6 +695,31 @@ export default function Home() {
                   onTriggerScenario={handleTriggerScenario}
                 />
 
+                {/* Dr. TVG Sridevi SDC-II Review Defense Fast-Launch Banner */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-[#0B0F19] to-amber-950/40 border border-indigo-500/40 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-indigo-950/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center flex-shrink-0">
+                      <GraduationCap className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white font-sans">SDC-II Review Defense Hub</h4>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">DR. TVG SRIDEVI EVALUATION READY</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        12-point rubric aligned defense: Base Paper comparisons, Tech justifications, Team member contribution matrix, and Viva Q&amp;A simulator.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage("review_defense")}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-indigo-600/30 flex-shrink-0"
+                  >
+                    Launch Defense Hub
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
                 {/* Active Replicator Sentinel Interactive Banner */}
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-red-950/50 via-[#0B0F19] to-cyan-950/40 border border-red-500/40 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-red-950/30">
                   <div className="flex items-center gap-3">
@@ -940,6 +969,10 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {currentPage === "review_defense" && (
+              <ReviewDefenseHubView onNavigate={(p) => setCurrentPage(p as Page)} />
             )}
 
             {currentPage === "active_threats" && (

@@ -44,12 +44,14 @@ import { AICopilotView } from "../components/AICopilotView";
 import { SPSBenchmarkView } from "../components/SPSBenchmarkView";
 import { SiemGatewayView } from "../components/SiemGatewayView";
 import { GovernanceLabView } from "../components/GovernanceLabView";
+import { ActiveThreatReplicatorView } from "../components/ActiveThreatReplicatorView";
 import { Award, Network, Fingerprint, MessageSquare } from "lucide-react";
 import { SYNTHETIC_DEMO_ARTIFACTS, DemoScenarioArtifact } from "../services/demoEngine";
 import { FileCRUDEvent, ThreatCategory } from "../types";
 
 type Page = 
   | "dashboard"
+  | "active_threats"
   | "ai_chat"
   | "mitigation"
   | "knowledge"
@@ -220,11 +222,36 @@ export default function Home() {
       const res = await fetch(`${API_BASE_URL}/api/fim/events`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.events) && data.events.length > 0) {
+        const eventList = Array.isArray(data) ? data : (data.events || []);
+        if (eventList.length > 0) {
           setCrudEvents((prev) => {
-            // Merge unique by ID
             const existingIds = new Set(prev.map(e => e.id));
-            const newEvts = data.events.filter((e: any) => !existingIds.has(e.id));
+            const newEvts = eventList
+              .filter((e: any) => !existingIds.has(e.id))
+              .map((e: any) => {
+                const c = e.canonical || {};
+                const ta = e.threat_analysis || {};
+                const fp = c.file_path || "";
+                const fn = fp ? fp.split(/[\/\\]/).pop() : (e.raw_message || "event_artifact");
+                return {
+                  id: e.id,
+                  timestamp: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+                  event_type: (c.action || "CREATED").toUpperCase(),
+                  file_path: fp || "monitored_workspace/file",
+                  file_name: fn,
+                  file_size_bytes: 4096,
+                  file_hash: c.file_hash_sha256 || "",
+                  process_name: "fim_watcher",
+                  user: "NT AUTHORITY\\SYSTEM",
+                  threat_status: e.is_suspicious ? "THREAT" : "SAFE",
+                  category: ta.classification || (e.is_suspicious ? "Malware" : "BENIGN"),
+                  severity: (ta.severity || "MEDIUM").toUpperCase(),
+                  confidence: Math.round((ta.confidence || 0.95) * 100),
+                  reasons: [ta.rationale || e.raw_message],
+                  evidence: ta.indicators || [],
+                  quarantined: e.status === "QUARANTINED"
+                };
+              });
             return [...newEvts, ...prev];
           });
         }
@@ -401,6 +428,7 @@ export default function Home() {
 
   const operationsNavItems = [
     { id: "dashboard" as Page, label: "SOC Dashboard", icon: LayoutDashboard },
+    { id: "active_threats" as Page, label: "Active Threat & Replicators", icon: Flame, badge: "SENTINEL" },
     { id: "ai_chat" as Page, label: "AI SOC Copilot", icon: Bot, badge: "MEMORY" },
     { id: "mitigation" as Page, label: "Threat Mitigation", icon: Zap, badge: "HITL" },
     { id: "knowledge" as Page, label: "Knowledge Base", icon: BrainCircuit },
@@ -663,6 +691,31 @@ export default function Home() {
                   onTriggerScenario={handleTriggerScenario}
                 />
 
+                {/* Active Replicator Sentinel Interactive Banner */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-red-950/50 via-[#0B0F19] to-cyan-950/40 border border-red-500/40 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-red-950/30">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0">
+                      <Flame className="w-5 h-5 text-red-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white font-sans">Active Threat & Harmless Replicator Sentinel</h4>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-bold border border-red-500/40">AUTONOMOUS INTERCEPTION</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Execute controlled in-memory worker threads, test autonomous process termination, signature banning, and .quarantine enclave relocation.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage("active_threats")}
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-red-600/30 flex-shrink-0"
+                  >
+                    Open Sentinel Lab
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
                 {/* Stat Cards Grid (Live Data from SQLite & FIM) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-rose-500">
@@ -859,7 +912,8 @@ export default function Home() {
                                   obfuscated_code: evt.category?.includes("Script") || false,
                                   network_comms: false,
                                   destructive_file_ops: evt.category?.includes("Ransomware") || false,
-                                  suspicious_process_exec: evt.threat_status === "THREAT"
+                                  suspicious_process_exec: evt.threat_status === "THREAT",
+                                  encoded_payloads: false
                                 },
                                 content: `// Inspected workspace artifact: ${evt.file_name}\n// Path: ${evt.file_path}\n// Event: ${evt.event_type}\n// Status: ${evt.threat_status}`
                               };
@@ -886,6 +940,10 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {currentPage === "active_threats" && (
+              <ActiveThreatReplicatorView onNavigate={(p) => setCurrentPage(p as Page)} />
             )}
 
             {currentPage === "ai_chat" && <AICopilotView />}

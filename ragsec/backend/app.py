@@ -15,6 +15,8 @@ from api.audit_routes import router as audit_router
 from api.sps_routes import router as sps_router
 from api.siem_routes import router as siem_router
 from api.governance_routes import router as governance_router
+from api.active_threat_routes import router as active_threat_router
+from analysis.active_threat_detector import active_threat_detector
 from config import settings
 
 from contextlib import asynccontextmanager
@@ -27,10 +29,17 @@ async def lifespan(app: FastAPI):
     workspace_dir = os.environ.get("RAGSEC_MONITORED_DIR", os.path.abspath(os.path.join(os.getcwd(), "..", "..", "monitored_workspace")))
     os.makedirs(workspace_dir, exist_ok=True)
     os.makedirs(os.path.join(workspace_dir, ".quarantine"), exist_ok=True)
+    os.makedirs(os.path.join(workspace_dir, "replication_sandbox"), exist_ok=True)
     watcher = FIMWatcher(workspace_dir)
     watcher.start()
+
+    # Start Active Defense Real-time Interceptor Sentinel Daemon
+    active_threat_detector.start_sentinel_daemon()
+
     yield
+
     watcher.stop()
+    active_threat_detector.stop_sentinel_daemon()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -58,6 +67,7 @@ app.include_router(audit_router)
 app.include_router(sps_router)
 app.include_router(siem_router)
 app.include_router(governance_router)
+app.include_router(active_threat_router)
 
 @app.get("/")
 def root_status():

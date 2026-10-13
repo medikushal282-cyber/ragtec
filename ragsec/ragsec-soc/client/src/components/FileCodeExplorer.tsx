@@ -164,9 +164,9 @@ export const FileCodeExplorer: React.FC<FileCodeExplorerProps> = ({
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono truncate">{art.file_path}</div>
-                  {art.risk_score !== undefined && (
+                  {(art as any).risk_score !== undefined && (
                     <div className="text-[10px] text-slate-500 font-mono mt-1 flex justify-between">
-                      <span>Risk: <strong className={art.risk_score > 60 ? "text-rose-400" : "text-emerald-400"}>{art.risk_score}/100</strong></span>
+                      <span>Risk: <strong className={(art as any).risk_score > 60 ? "text-rose-400" : "text-emerald-400"}>{(art as any).risk_score}/100</strong></span>
                       <span>{(art.size_bytes / 1024).toFixed(1)} KB</span>
                     </div>
                   )}

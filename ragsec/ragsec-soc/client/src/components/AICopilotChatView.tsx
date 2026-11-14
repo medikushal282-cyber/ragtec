@@ -101,6 +101,7 @@ export interface AICopilotChatViewProps {
     category?: string;
   } | null;
   onNavigateToMitigation?: () => void;
+  onOpenBrainModal?: () => void;
 }
 
 const DEFAULT_MODELS = [
@@ -140,7 +141,8 @@ const STARTER_PROMPTS = [
 export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
   activeModel: propActiveModel,
   initialThreat,
-  onNavigateToMitigation
+  onNavigateToMitigation,
+  onOpenBrainModal
 }) => {
   // Model state synced with localStorage and props
   const [selectedModel, setSelectedModel] = useState<string>(() => 
@@ -871,19 +873,31 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
             </button>
 
             {/* Model Selector Dropdown */}
-            <div className="relative group flex-shrink-0">
-              <select
-                value={selectedModel}
-                onChange={(e) => handleSelectModel(e.target.value)}
-                className="appearance-none pl-2.5 sm:pl-3 pr-7 sm:pr-8 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-xs font-semibold text-white focus:outline-none focus:border-blue-500/50 cursor-pointer font-mono max-w-[145px] sm:max-w-[175px] lg:max-w-[220px] truncate"
-              >
-                {DEFAULT_MODELS.map((m) => (
-                  <option key={m.id} value={m.id} className="bg-[#0C101A] text-white">
-                    {m.name} ({m.badge})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2 sm:right-2.5 top-2.5 pointer-events-none" />
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="relative group">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => handleSelectModel(e.target.value)}
+                  className="appearance-none pl-2.5 sm:pl-3 pr-7 sm:pr-8 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.1] text-xs font-semibold text-white focus:outline-none focus:border-blue-500/50 cursor-pointer font-mono max-w-[145px] sm:max-w-[175px] lg:max-w-[220px] truncate"
+                >
+                  {DEFAULT_MODELS.map((m) => (
+                    <option key={m.id} value={m.id} className="bg-[#0C101A] text-white">
+                      {m.name} ({m.badge})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2 sm:right-2.5 top-2.5 pointer-events-none" />
+              </div>
+
+              {onOpenBrainModal && (
+                <button
+                  onClick={onOpenBrainModal}
+                  className="p-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 hover:text-white transition-all apple-button"
+                  title="Configure Groq AI Brain Models, API Key & LPU Tiers"
+                >
+                  <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                </button>
+              )}
             </div>
 
             {/* Interactive Target Host / Process Switcher (Preset + Process Targets) */}

@@ -51,7 +51,11 @@ interface KnowledgeDoc {
   confidence?: number;
 }
 
-export const KnowledgeBaseView: React.FC = () => {
+interface KnowledgeBaseViewProps {
+  onOpenPaperModal?: () => void;
+}
+
+export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ onOpenPaperModal }) => {
   const [sources, setSources] = useState<KnowledgeDoc[]>([]);
   const [filterType, setFilterType] = useState<"ALL" | "PLAYBOOKS" | "INTEL">("ALL");
   const [filterTier, setFilterTier] = useState<"ALL" | "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED">("ALL");
@@ -316,6 +320,45 @@ Log4Shell (CVE-2021-44228) involves JNDI injection via unauthenticated HTTP head
           <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isLoading ? "animate-spin" : ""}`} />
           <span>Sync Repository</span>
         </button>
+      </div>
+
+      {/* IEEE ICAIC 2026 Reference Paper Specification Card */}
+      <div className="glass-panel p-4.5 rounded-2xl border border-blue-500/25 bg-blue-950/20 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <BookOpen className="w-5 h-5 text-blue-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold text-white tracking-tight">
+                IEEE ICAIC 2026 Reference Architecture & Specification
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-mono font-medium border border-blue-500/30">
+                Peer-Reviewed Framework
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              &ldquo;RAGSec: Autonomous End-to-End Dynamic Ransomware Containment via Multi-Factor Risk Vector Scoring, Grounded LLM Playbooks, and Real-Time Cryptographic Enclave Enforcement.&rdquo;
+            </p>
+            <div className="flex items-center gap-3 mt-2 text-[11px] font-mono text-[#8E8E93]">
+              <span>Section IV: FIM Engine</span>
+              <span>•</span>
+              <span>Section V: Multi-Factor Risk Metric</span>
+              <span>•</span>
+              <span>Section VI: Grounded CTI RAG</span>
+            </div>
+          </div>
+        </div>
+
+        {onOpenPaperModal && (
+          <button
+            onClick={onOpenPaperModal}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 apple-button transition-all shadow-md self-start sm:self-center flex-shrink-0"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Open Paper Specification</span>
+          </button>
+        )}
       </div>
 
       {/* Preset Artifact Pills */}

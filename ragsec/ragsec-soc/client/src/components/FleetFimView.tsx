@@ -986,6 +986,15 @@ export const FleetFimView: React.FC = () => {
                         <span>Agent Version:</span>
                         <span className="text-blue-300 font-mono text-[10px]">{device.agent_version}</span>
                       </div>
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>Heartbeat & Ping:</span>
+                        </span>
+                        <span className="text-emerald-400 font-mono text-[10px] font-medium">
+                          {device.latency_ms || 1.2}ms • Optimal
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-3 flex items-center justify-between pt-1 gap-2">

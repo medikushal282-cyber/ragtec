@@ -140,7 +140,7 @@ export const SPSBenchmarkView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner with IEEE Attribution */}
+      {/* Top Banner with Benchmark Attribution */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-[#0B0F19] border border-cyan-500/30 shadow-xl shadow-cyan-950/30 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -153,7 +153,7 @@ export const SPSBenchmarkView: React.FC = () => {
                   SOC Productivity Score (SPS) & 3-Way Benchmark Lab
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                  IEEE Section VIII
+                  Benchmark Suite
                 </span>
               </div>
               <p className="text-xs text-slate-300">
@@ -179,7 +179,7 @@ export const SPSBenchmarkView: React.FC = () => {
           <div className="flex items-center gap-3">
             <Calculator className="w-5 h-5 text-cyan-400" />
             <div>
-              <span className="text-slate-400 text-[11px] block">IEEE Evaluative Objective Formulation:</span>
+              <span className="text-slate-400 text-[11px] block">Evaluative Objective Formulation:</span>
               <span className="text-cyan-300 font-bold text-sm">
                 SPS = α(FA + RS + CI) − β(USR) + γ(TE)
               </span>
@@ -379,7 +379,7 @@ export const SPSBenchmarkView: React.FC = () => {
         {/* Scenarios List */}
         <div className="p-5 rounded-2xl bg-[#080C14] border border-white/10 space-y-3 font-mono">
           <div className="flex items-center justify-between border-b border-white/10 pb-2">
-            <span className="text-xs font-bold text-white uppercase">6 IEEE Threat Scenarios</span>
+            <span className="text-xs font-bold text-white uppercase">6 Standard Threat Scenarios</span>
             <span className="text-[10px] text-slate-400">Ground-Truth Suite</span>
           </div>
           <div className="space-y-2 max-h-[380px] overflow-y-auto">

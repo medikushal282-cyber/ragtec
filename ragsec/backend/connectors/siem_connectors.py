@@ -92,7 +92,7 @@ class SIEMExporter:
             "close_notes": None,
             "created_on": now_utc,
             "integration_metadata": {
-                "source": "IEEE RAGSec Threat Intelligence Core",
+                "source": "RAGSec Threat Intelligence Core",
                 "evidence_citations": payload.evidence_tags,
                 "mitre_attack": payload.techniques
             }

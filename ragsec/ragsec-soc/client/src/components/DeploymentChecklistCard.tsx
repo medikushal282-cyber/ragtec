@@ -21,7 +21,8 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 interface ChecklistItem {
   id: string;
   title: string;
-  paper_section: string;
+  control_section?: string;
+  paper_section?: string;
   status: string;
   description: string;
   technical_control: string;
@@ -57,7 +58,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-01",
           title: "Private-Cloud or Air-Gapped Deployment",
-          paper_section: "Section V-C, Point 1",
+          control_section: "Control SEC-01",
           status: "CERTIFIED",
           description: "Full system operation without external dependencies; no training data leaves organizational boundaries.",
           technical_control: "Local ChromaDB vector store, on-premise Groq/BERT cross-encoders with zero data egress.",
@@ -66,7 +67,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-02",
           title: "Data Governance Alignment",
-          paper_section: "Section V-C, Point 2",
+          control_section: "Control SEC-02",
           status: "CERTIFIED",
           description: "Ingestion and retrieval pipelines respect IAM roles, data classification tiers, and regulatory boundaries.",
           technical_control: "SensitivityTier enum (Public, Internal, Confidential, Restricted) with compliance buffer masking.",
@@ -75,7 +76,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-03",
           title: "Auditable Retrieval Paths",
-          paper_section: "Section V-C, Point 3",
+          control_section: "Control SEC-03",
           status: "CERTIFIED",
           description: "Every generated claim is traceable to retrieval logs for post-incident review and compliance audits.",
           technical_control: "Immutable SQLite audit ledger with cryptographic SHA-256 evidence seals on all events.",
@@ -84,7 +85,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-04",
           title: "Abstention-by-Policy",
-          paper_section: "Section V-C, Point 4",
+          control_section: "Control SEC-04",
           status: "CERTIFIED",
           description: "When retrieval confidence or similarity thresholds are unmet, system abstains rather than speculate.",
           technical_control: "Severity-aware gating in evaluate_evidence_policy(); produces ABSTAINED or ESCALATED response status.",
@@ -93,7 +94,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-05",
           title: "Evidence-Bound Output",
-          paper_section: "Section V-C, Point 5",
+          control_section: "Control SEC-05",
           status: "CERTIFIED",
           description: "All analytical statements are citation-linked to supporting document IDs, preventing unverifiable claims.",
           technical_control: "Mandatory citation template parser enforces [C1], [C2] tags and Chain-of-Retrieval Consistency.",
@@ -102,7 +103,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-06",
           title: "Incident-Severity Integration",
-          paper_section: "Section V-C, Point 6",
+          control_section: "Control SEC-06",
           status: "CERTIFIED",
           description: "Thresholds for abstention and redaction adapt based on incident severity (P1 ransomware vs low-priority phishing).",
           technical_control: "Adaptive thresholds: P1 Critical (θ_sim=0.70-0.85, θ_conf=0.70-0.90) to P4 Low (θ_sim=0.55).",
@@ -111,7 +112,7 @@ export const DeploymentChecklistCard: React.FC = () => {
         {
           id: "DRC-07",
           title: "Operational Safety Measures",
-          paper_section: "Section V-C, Point 7",
+          control_section: "Control SEC-07",
           status: "CERTIFIED",
           description: "Sensitive fields are masked prior to model inference; state changes require authenticated operator approval.",
           technical_control: "mask_compliance_buffer() replaces internal IPs, tokens, emails; HitL mitigation approval required.",
@@ -128,7 +129,7 @@ export const DeploymentChecklistCard: React.FC = () => {
   }, []);
 
   const handleVerifyAll = () => {
-    toast.success("All 7 IEEE Section V-C criteria verified: 100% Production Ready!");
+    toast.success("All 7 enterprise security criteria verified: 100% Production Ready!");
   };
 
   return (
@@ -138,14 +139,14 @@ export const DeploymentChecklistCard: React.FC = () => {
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
             <h3 className="font-semibold text-white text-sm">
-              IEEE Deployment Readiness Checklist
+              Enterprise Deployment Readiness Checklist
             </h3>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-mono border border-emerald-500/25">
-              Section V-C Certified
+              Production Certified
             </span>
           </div>
           <p className="text-xs text-[#8E8E93] mt-0.5">
-            Validation of enterprise deployment constraints beyond academic research prototypes
+            Validation of enterprise security, isolation, and operational deployment constraints
           </p>
         </div>
 
@@ -211,7 +212,7 @@ export const DeploymentChecklistCard: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-white text-xs">{item.title}</span>
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/[0.06] text-[#8E8E93] font-mono">
-                        {item.paper_section}
+                        {item.control_section || item.paper_section}
                       </span>
                     </div>
                     <p className="text-[11px] text-[#8E8E93] mt-0.5 line-clamp-1">

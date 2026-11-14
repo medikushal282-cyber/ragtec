@@ -84,10 +84,10 @@ interface ThreatCompareResult {
 }
 
 interface KnowledgeBaseViewProps {
-  onOpenPaperModal?: () => void;
+  // Configurable props
 }
 
-export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ onOpenPaperModal }) => {
+export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = () => {
   const [sources, setSources] = useState<KnowledgeDoc[]>([]);
   const [filterType, setFilterType] = useState<"ALL" | "LIVE_FEEDS" | "PLAYBOOKS" | "INTEL">("ALL");
   const [isLoading, setIsLoading] = useState(false);
@@ -419,7 +419,7 @@ def backup_logs():
                 THREAT INTELLIGENCE INCUBATOR
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-white/[0.05] text-[#8E8E93] border border-white/[0.08]">
-                IEEE Section VI-C RAG Engine
+                Production RAG Engine
               </span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
@@ -433,16 +433,6 @@ def backup_logs():
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {onOpenPaperModal && (
-              <button
-                onClick={onOpenPaperModal}
-                className="apple-button px-3 py-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                IEEE Architecture
-              </button>
-            )}
-
             <button
               onClick={() => setShowIngestModal(true)}
               className="apple-button px-3.5 py-2 rounded-xl border border-white/[0.12] bg-white/[0.05] hover:bg-white/[0.08] text-white text-xs font-semibold flex items-center gap-1.5 transition-all"
@@ -472,7 +462,7 @@ def backup_logs():
               stages={[
                 "Connecting to CISA KEV JSON endpoint",
                 "Parsing active ransomware & zero-day advisories",
-                "Synthesizing IEEE Section VI containment playbooks",
+                "Synthesizing automated containment playbooks",
                 "Vectorizing & indexing embeddings into ChromaDB"
               ]}
               accentColor="emerald"
@@ -810,7 +800,7 @@ def backup_logs():
                 <div className="space-y-2">
                   <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                     <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                    Grounded Mitigation Playbook Steps (IEEE Section VI-C)
+                    Grounded Mitigation Playbook Steps
                   </div>
                   <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                     {(compareResult.recommended_actions || []).map((act) => (

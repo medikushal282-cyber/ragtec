@@ -92,10 +92,10 @@ def export_security_audit_report():
     audit_logs = get_all_records("audit_logs")
     
     report_payload = {
-        "title": "RAGSec IEEE Threat & P8 Platform Audit Report",
+        "title": "RAGSec Platform Security Audit Report",
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "evaluator": "Autonomous Security Benchmark Engine v1.0",
-        "compliance_standard": "IEEE HitL Security Architecture & CRC Citation Verification",
+        "compliance_standard": "Enterprise HitL Security Architecture & CRC Citation Verification",
         "summary": {
             "total_tests_executed": 8,
             "passed_tests": 8,

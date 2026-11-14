@@ -168,7 +168,7 @@ export const GovernanceLabView: React.FC = () => {
                   Governance, CRC Grounding & PII Redaction Center
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                  IEEE Section VII
+                  Enterprise Security Controls
                 </span>
               </div>
               <p className="text-xs text-slate-300">

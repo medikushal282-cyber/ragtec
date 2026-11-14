@@ -136,7 +136,7 @@ export const TestReportsView: React.FC = () => {
         reportData = await res.json();
       } else {
         reportData = {
-          title: "RAGSec IEEE Threat & P8 Platform Audit Report",
+          title: "RAGSec Platform Security Audit Report",
           generated_at: new Date().toISOString(),
           evaluator: "Autonomous Security Benchmark Engine",
           summary: {
@@ -183,7 +183,7 @@ export const TestReportsView: React.FC = () => {
                 </span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Autonomous Phase 01–08 Test Suite • IEEE Security Architecture Certification • Cryptographic Verification
+                Autonomous Phase 01–08 Test Suite • Enterprise Security Certification • Cryptographic Verification
               </p>
             </div>
           </div>
@@ -238,7 +238,7 @@ export const TestReportsView: React.FC = () => {
             { label: "Stage 2/5: Validating 10-Archetype Threat Detection & High-Entropy Classifier", targetPercent: 20 },
             { label: "Stage 3/5: Benchmarking RAG Retrieval Latency & Grounded Context Attribution", targetPercent: 45 },
             { label: "Stage 4/5: Testing SAST Code Parameterization & Automated Patch Injection", targetPercent: 70 },
-            { label: "Stage 5/5: Generating Cryptographic Audit Signature & Verifying IEEE Metrics", targetPercent: 90 }
+            { label: "Stage 5/5: Generating Cryptographic Audit Signature & Verifying Compliance Metrics", targetPercent: 90 }
           ]}
         />
       )}
@@ -279,7 +279,7 @@ export const TestReportsView: React.FC = () => {
         </div>
       )}
 
-      {/* IEEE Section V-C Deployment Readiness Checklist Card */}
+      {/* Deployment Readiness Checklist Card */}
       <DeploymentChecklistCard />
 
       {/* Certificate Card */}
@@ -291,7 +291,7 @@ export const TestReportsView: React.FC = () => {
             </div>
             <div>
               <h3 className="font-bold text-white text-sm font-sans tracking-tight">
-                IEEE RAGSec Verification & Platform Compliance Certificate
+                RAGSec Verification & Platform Compliance Certificate
               </h3>
               <p className="text-slate-400 text-xs mt-0.5 font-mono">
                 Cryptographically audited and certified for Autonomous Human-in-the-Loop SOC operations
@@ -314,7 +314,7 @@ export const TestReportsView: React.FC = () => {
           </div>
           <div>
             <span className="text-slate-400 block text-[10px] uppercase font-semibold">Compliance Spec:</span>
-            <strong className="text-white">IEEE HitL Security Architecture</strong>
+            <strong className="text-white">Enterprise HitL Security Architecture</strong>
           </div>
         </div>
       </div>

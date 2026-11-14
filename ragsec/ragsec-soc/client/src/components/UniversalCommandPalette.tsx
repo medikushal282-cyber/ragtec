@@ -32,7 +32,6 @@ interface UniversalCommandPaletteProps {
   onScanWorkspace: () => void;
   onExportAudit: () => void;
   onOpenBrainModal: () => void;
-  onOpenPaperModal: () => void;
   onOpenUserModal: () => void;
   activeModel: string;
   onSearchCTI: (query: string) => void;
@@ -56,7 +55,6 @@ export const UniversalCommandPalette: React.FC<UniversalCommandPaletteProps> = (
   onScanWorkspace,
   onExportAudit,
   onOpenBrainModal,
-  onOpenPaperModal,
   onOpenUserModal,
   activeModel,
   onSearchCTI
@@ -203,18 +201,6 @@ export const UniversalCommandPalette: React.FC<UniversalCommandPaletteProps> = (
       badge: "Groq LPU",
       action: () => {
         onOpenBrainModal();
-        onClose();
-      }
-    },
-    {
-      id: "act-paper",
-      title: "IEEE ICAIC 2026 Reference Specification",
-      subtitle: "Review published research paper architecture, CRC math & benchmark metrics",
-      category: "SOC Actions",
-      icon: BookOpen,
-      badge: "IEEE",
-      action: () => {
-        onOpenPaperModal();
         onClose();
       }
     },

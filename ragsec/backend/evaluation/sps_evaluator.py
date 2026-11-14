@@ -400,7 +400,7 @@ class SPSEvaluator:
 
         comparison_matrix = [
             BaselineComparisonRow(
-                architecture="RAGSec (IEEE Proposed Framework)",
+                architecture="RAGSec Autonomous SOC Framework",
                 factual_alignment=avg_ragsec["factual_alignment"],
                 relevance_score=avg_ragsec["relevance_score"],
                 completeness_index=avg_ragsec["completeness_index"],
@@ -442,7 +442,7 @@ class SPSEvaluator:
 
         return {
             "status": "COMPLETED",
-            "benchmark_version": "IEEE-ICAIC-2026-v1.0",
+            "benchmark_version": "RAGSec-SPS-v1.0",
             "weights_applied": w.model_dump(),
             "comparison_matrix": comparison_matrix,
             "scenarios_count": len(BENCHMARK_SCENARIOS),

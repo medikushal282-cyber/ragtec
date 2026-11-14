@@ -21,7 +21,10 @@ import {
   ChevronRight,
   ExternalLink,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Flame,
+  ShieldAlert,
+  FileText
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -35,13 +38,15 @@ interface UniversalCommandPaletteProps {
   onOpenUserModal: () => void;
   activeModel: string;
   onSearchCTI: (query: string) => void;
+  onTriggerScenario?: (scenarioKey: string) => void;
+  onOpenExecutiveBrief?: () => void;
 }
 
 interface CommandItem {
   id: string;
   title: string;
   subtitle: string;
-  category: "Navigation" | "SOC Actions" | "Security Enclave" | "Threat Intelligence";
+  category: "Navigation" | "SOC Actions" | "Security Enclave" | "Threat Intelligence" | "Demo Scenarios";
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
   shortcut?: string;
@@ -224,6 +229,69 @@ export const UniversalCommandPalette: React.FC<UniversalCommandPaletteProps> = (
       badge: "Isolated",
       action: () => {
         onNavigate("file_scanner");
+        onClose();
+      }
+    },
+    {
+      id: "act-exec-brief",
+      title: "Generate Executive Incident Debrief",
+      subtitle: "Compile active incidents, quarantined artifacts & audit status into a briefing report",
+      category: "SOC Actions",
+      icon: FileText,
+      badge: "Briefing",
+      shortcut: "G B",
+      action: () => {
+        onOpenExecutiveBrief?.();
+        onClose();
+      }
+    },
+
+    // Demo & Presentation Presets
+    {
+      id: "demo-lockbit",
+      title: "Demo Scenario: LockBit 3.0 Ransomware Attack",
+      subtitle: "Simulate shadow copy deletion (T1490), vssadmin tampering & critical alert",
+      category: "Demo Scenarios",
+      icon: Flame,
+      badge: "CRITICAL",
+      action: () => {
+        onTriggerScenario?.("ransomware");
+        onClose();
+      }
+    },
+    {
+      id: "demo-backdoor",
+      title: "Demo Scenario: Web Backdoor & Reverse Shell",
+      subtitle: "Inject web backdoor payload and trigger CTI file & process RAG comparison",
+      category: "Demo Scenarios",
+      icon: ShieldAlert,
+      badge: "HIGH",
+      action: () => {
+        onTriggerScenario?.("backdoor");
+        onClose();
+      }
+    },
+    {
+      id: "demo-mimikatz",
+      title: "Demo Scenario: Mimikatz Credential Dumping",
+      subtitle: "Simulate encoded PowerShell credential extraction on fleet endpoint",
+      category: "Demo Scenarios",
+      icon: Terminal,
+      badge: "HIGH",
+      action: () => {
+        onTriggerScenario?.("credential");
+        onClose();
+      }
+    },
+    {
+      id: "demo-baseline",
+      title: "Demo Scenario: Reset to Clean Baseline",
+      subtitle: "Purge temporary test files and restore monitored workspace to nominal state",
+      category: "Demo Scenarios",
+      icon: ShieldCheck,
+      badge: "CLEAN",
+      action: () => {
+        onTriggerScenario?.("baseline");
         onClose();
       }
     }

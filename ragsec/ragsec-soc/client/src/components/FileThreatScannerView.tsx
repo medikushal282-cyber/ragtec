@@ -52,6 +52,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
+import { MitreKillchainRibbon } from "./MitreKillchainRibbon";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -2285,6 +2286,16 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
                 </p>
               )}
             </div>
+
+            {/* MITRE ATT&CK Killchain Matrix Alignment */}
+            <MitreKillchainRibbon
+              threatCategory={selectedFile.threat_category || selectedFile.vulnerability_details?.title}
+              verdict={selectedFile.verdict}
+              fileName={selectedFile.filename}
+              cwe={selectedFile.vulnerability_details?.cwe}
+              reasons={selectedFile.summary ? [selectedFile.summary] : []}
+              compact={true}
+            />
 
             {/* Quick Actions Bar */}
             <div className="flex flex-wrap items-center gap-2 pt-1">

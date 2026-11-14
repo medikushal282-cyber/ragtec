@@ -18,6 +18,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
+import { MitreKillchainRibbon } from "./MitreKillchainRibbon";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -310,6 +311,15 @@ export const IncidentTriageView: React.FC<IncidentTriageViewProps> = ({ onNaviga
                     <span>Confidence: <strong className="text-emerald-400">{selectedIncident.threat_classification?.confidence || 98}%</strong></span>
                   </div>
                 </div>
+
+                {/* MITRE ATT&CK Killchain Alignment for Incident */}
+                <MitreKillchainRibbon
+                  threatCategory={selectedIncident.threat_classification?.category}
+                  verdict={selectedIncident.threat_classification?.state === "CONFIRMED_THREAT" ? "UNSAFE" : "VULNERABLE"}
+                  fileName={selectedIncident.title}
+                  reasons={[selectedIncident.threat_classification?.rationale || ""]}
+                  compact={true}
+                />
 
                 {/* Investigation Result if available */}
                 {investigationResult && (() => {

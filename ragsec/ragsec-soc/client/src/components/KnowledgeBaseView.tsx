@@ -32,10 +32,12 @@ import {
   AlertTriangle,
   Play,
   Copy,
-  ExternalLink
+  ExternalLink,
+  FileCode
 } from "lucide-react";
 import { toast } from "sonner";
 import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
+import { DetectionRuleExportModal } from "./DetectionRuleExportModal";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -117,6 +119,7 @@ export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = () => {
   const [compareContent, setCompareContent] = useState("");
   const [isComparing, setIsComparing] = useState(false);
   const [compareResult, setCompareResult] = useState<ThreatCompareResult | null>(null);
+  const [showDetectionModal, setShowDetectionModal] = useState(false);
 
   // Ingestion Form State (Manual Playbooks)
   const [showIngestModal, setShowIngestModal] = useState(false);
@@ -798,9 +801,19 @@ def backup_logs():
 
                 {/* Grounded Containment Playbook Actions */}
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                    Grounded Mitigation Playbook Steps
+                  <div className="flex items-center justify-between text-xs pb-0.5">
+                    <div className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Grounded Mitigation Playbook Steps</span>
+                    </div>
+                    <button
+                      onClick={() => setShowDetectionModal(true)}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/35 text-indigo-300 text-[11px] font-semibold flex items-center gap-1.5 transition-all apple-button shadow-sm"
+                      title="Synthesize and export production Sigma & YARA rules"
+                    >
+                      <FileCode className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Export Sigma / YARA</span>
+                    </button>
                   </div>
                   <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                     {(compareResult.recommended_actions || []).map((act) => (
@@ -1091,6 +1104,23 @@ def backup_logs():
             </form>
           </div>
         </div>
+      )}
+      {/* 1-Click Sigma & YARA Detection Rule Export Modal */}
+      {showDetectionModal && (
+        <DetectionRuleExportModal
+          isOpen={showDetectionModal}
+          onClose={() => setShowDetectionModal(false)}
+          threatTitle={compareResult?.file_name || compareFileName}
+          threatCategory={compareResult?.threat_verdict || "Malicious Payload"}
+          fileName={compareFileName}
+          cve="CVE-2023-34362"
+          ttps={["T1059.001", "T1490", "T1190"]}
+          indicators={
+            compareContent
+              ? [compareContent.slice(0, 60), compareProcessName, "vssadmin delete shadows"].filter(Boolean)
+              : ["vssadmin delete shadows", "Invoke-Expression", "powershell.exe -enc"]
+          }
+        />
       )}
     </div>
   );

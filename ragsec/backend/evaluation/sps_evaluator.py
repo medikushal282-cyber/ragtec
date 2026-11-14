@@ -1,6 +1,6 @@
 """
 ragsec.backend.evaluation.sps_evaluator
-Implements the exact mathematical evaluation metrics and benchmark suite from the IEEE RAGSec paper:
+Implements the exact mathematical evaluation metrics and benchmark suite:
 - Factual Alignment (FA)
 - Relevance Score (RS)
 - Completeness Index (CI)
@@ -54,7 +54,7 @@ class BaselineComparisonRow(BaseModel):
     triage_speedup_pct: float
 
 
-# Ground Truth IEEE Benchmark Scenarios
+# Ground Truth Canonical Benchmark Scenarios
 BENCHMARK_SCENARIOS = [
     {
         "id": "SCENARIO-01",
@@ -137,7 +137,7 @@ def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
 
 class SPSEvaluator:
     """
-    Evaluates cybersecurity RAG generation pipelines against the IEEE RAGSec framework formulas.
+    Evaluates cybersecurity RAG generation pipelines against the Canonical RAGSec framework formulas.
     """
 
     def __init__(self):
@@ -270,7 +270,7 @@ class SPSEvaluator:
         weights: Optional[SPSWeights] = None
     ) -> EvaluationResult:
         """
-        Runs complete IEEE evaluation for a single query/response pair.
+        Runs complete benchmark evaluation for a single query/response pair.
         """
         fa, verified_c, total_c = self.calculate_factual_alignment(response_text, evidence_texts or [])
         rs = self.calculate_relevance_score(query, response_text)
@@ -301,7 +301,7 @@ class SPSEvaluator:
 
     def run_3way_benchmark_matrix(self, weights: Optional[SPSWeights] = None) -> Dict[str, Any]:
         """
-        Executes the 3-Way Architectural Comparison Suite across all 6 IEEE Benchmark Scenarios:
+        Executes the 3-Way Architectural Comparison Suite across all 6 Benchmark Scenarios:
         1. RAGSec (Ours)
         2. LLM-Only (No Grounding / No Evidence)
         3. Search + Analyst (Manual Workflow)

@@ -140,6 +140,7 @@ def classify_preview(payload: ClassifyPreviewPayload):
 
 
 @router.post("/knowledge/classify-and-ingest")
+@router.post("/knowledge/ingest")
 @router.post("/ingest")
 def ingest_document(payload: IngestDocPayload):
     if not payload.content.strip():

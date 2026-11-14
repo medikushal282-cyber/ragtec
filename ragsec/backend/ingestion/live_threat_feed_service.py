@@ -119,7 +119,7 @@ class LiveThreatFeedService:
 
     def synthesize_mitigation_playbook(self, exploit: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Converts an online hack/CVE record into a structured IEEE Section VI Mitigation Playbook.
+        Converts an online hack/CVE record into a structured Mitigation Playbook.
         """
         cve_id = exploit.get("cveID", "CVE-UNKNOWN")
         vendor = exploit.get("vendorProject", "General Vendor")

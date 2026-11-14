@@ -133,7 +133,7 @@ def chunk_json(doc: CanonicalDocument) -> List[CanonicalChunk]:
     return chunks
 
 def chunk_document(doc: CanonicalDocument, strategy: str = None) -> List[CanonicalChunk]:
-    """Format-aware and strategy-aware parsing/chunking orchestrator (IEEE Section VI-C)."""
+    """Format-aware and strategy-aware parsing/chunking orchestrator."""
     if strategy == "IOC Table Rows" or doc.source_name.endswith('.csv') or doc.source_type in ['csv', 'ioc_table']:
         return chunk_ioc_csv(doc)
     elif strategy == "Rule Blocks" or doc.source_name.endswith('.yml') or doc.source_name.endswith('.yar') or doc.source_type in ['rule', 'playbook']:

@@ -1,14 +1,14 @@
 """
 verify_paper_features.py
-Comprehensive End-to-End Verification Suite for IEEE RAGSec Paper Implementations:
-1. SPS & 3-Way Baseline Comparison Matrix (Section VIII-A/B)
-2. Custom Query SPS Evaluator & Mathematical Model (Section VIII-B)
-3. Enterprise SIEM Connectors: ServiceNow, Splunk, Sentinel, QRadar (Section V-D)
-4. SHA-256 Non-Repudiation Cryptographic Seal (Section V-D)
-5. Governance, Severity-Aware Gating, and Diversity Engine (Section VII-A)
-6. Chain-of-Retrieval Consistency (CRC) Claim Grounding (Section VII-B)
-7. Compliance Buffer PII Redaction Live Diff (Section VII-C)
-8. Policy-Governed Safe Abstention on Low-Evidence (Section VII-B)
+Comprehensive End-to-End Verification Suite for Enterprise RAGSec Platform:
+1. SPS & 3-Way Baseline Comparison Matrix
+2. Custom Query SPS Evaluator & Mathematical Model
+3. Enterprise SIEM Connectors: ServiceNow, Splunk, Sentinel, QRadar
+4. SHA-256 Non-Repudiation Cryptographic Seal
+5. Governance, Severity-Aware Gating, and Diversity Engine
+6. Chain-of-Retrieval Consistency (CRC) Claim Grounding
+7. Compliance Buffer PII Redaction Live Diff
+8. Policy-Governed Safe Abstention on Low-Evidence
 9. Web Frontend HTTP Status & Asset Integrity (Port 3000)
 """
 import urllib.request
@@ -31,7 +31,7 @@ def make_request(url, data=None, method="GET"):
 
 def test_suite():
     print("=" * 70)
-    print(">>> RUNNING IEEE RAGSec PAPER FEATURE VERIFICATION SUITE")
+    print(">>> RUNNING ENTERPRISE RAGSEC FEATURE VERIFICATION SUITE")
     print("=" * 70)
     
     passed = 0
@@ -187,7 +187,7 @@ def test_suite():
         print(f"[FAIL] Test 9: {e}")
 
     print("=" * 70)
-    print(f">>> IEEE RAGSec PAPER FEATURE VERIFICATION: {passed}/{total} TESTS PASSED (100% SUCCESS)")
+    print(f">>> ENTERPRISE RAGSEC FEATURE VERIFICATION: {passed}/{total} TESTS PASSED (100% SUCCESS)")
     print("=" * 70)
     return passed == total
 

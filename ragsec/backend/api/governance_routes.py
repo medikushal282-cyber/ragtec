@@ -38,7 +38,7 @@ class AbstentionTestPayload(BaseModel):
 @router.get("/thresholds")
 def get_severity_thresholds():
     """
-    Returns current Severity-Aware Retrieval Gating configuration per Section VII-A of IEEE paper.
+    Returns current Severity-Aware Retrieval Gating configuration per Enterprise Governance Standard.
     """
     return {
         "thresholds": {

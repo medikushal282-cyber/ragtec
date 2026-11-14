@@ -10,6 +10,7 @@ import os
 import sys
 import psutil
 import datetime
+import time
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -189,6 +190,12 @@ def _assess_process_suspicion(name: str, cmdline: str, cpu_percent: float, memor
     return (is_suspicious, reasons, final_category, functional_role)
 
 
+_process_cache: Dict[str, Any] = {
+    "timestamp": 0.0,
+    "raw_processes": []
+}
+
+
 @router.get("")
 def list_running_processes(
     limit: int = Query(default=80, ge=1, le=300),
@@ -199,84 +206,94 @@ def list_running_processes(
     """
     Returns active running processes with resource usage, command lines,
     functional role classification, and behavioral threat heuristics.
+    Uses in-memory caching (TTL 10.0s) to keep UI responsive on Windows.
     """
-    process_list = []
-    suspicious_count = 0
-
-    for proc in psutil.process_iter(['pid', 'name', 'status', 'cpu_percent', 'memory_info', 'create_time']):
-        try:
-            info = proc.info
-            pid = info['pid']
-            name = info['name'] or f"proc_{pid}"
-
-            if pid == 0 and not search:
-                continue
-
-            # Command line inspection
-            cmdline = ""
+    global _process_cache
+    now = time.time()
+    
+    if now - _process_cache["timestamp"] < 10.0 and _process_cache["raw_processes"]:
+        raw_list = _process_cache["raw_processes"]
+    else:
+        raw_list = []
+        for proc in psutil.process_iter(['pid', 'name', 'status', 'cpu_percent', 'memory_info', 'create_time']):
             try:
-                cmd_parts = proc.cmdline()
-                cmdline = " ".join(cmd_parts) if cmd_parts else ""
-            except (psutil.AccessDenied, psutil.NoSuchProcess):
-                cmdline = f"[{name}] (System Process / Elevated Token)"
+                info = proc.info
+                pid = info['pid']
+                name = info['name'] or f"proc_{pid}"
 
-            mem_info = info.get('memory_info')
-            mem_mb = round((mem_info.rss / (1024 * 1024)), 1) if mem_info else 0.0
-            cpu_pct = round(info.get('cpu_percent') or 0.0, 1)
-
-            # Functional role & threat classification
-            is_suspicious, reasons, category, functional_role = _assess_process_suspicion(name, cmdline, cpu_pct, mem_mb, pid)
-            if is_suspicious:
-                suspicious_count += 1
-
-            # Search filter
-            if search:
-                search_q = search.lower().strip()
-                if (search_q not in name.lower() and 
-                    search_q not in str(pid) and 
-                    search_q not in cmdline.lower() and
-                    search_q not in functional_role.lower()):
+                if pid == 0:
                     continue
 
-            # Type filter
-            if filter == "suspicious" and not is_suspicious:
+                # Command line inspection
+                cmdline = ""
+                try:
+                    cmd_parts = proc.cmdline()
+                    cmdline = " ".join(cmd_parts) if cmd_parts else ""
+                except (psutil.AccessDenied, psutil.NoSuchProcess):
+                    cmdline = f"[{name}] (System Process / Elevated Token)"
+
+                mem_info = info.get('memory_info')
+                mem_mb = round((mem_info.rss / (1024 * 1024)), 1) if mem_info else 0.0
+                cpu_pct = round(info.get('cpu_percent') or 0.0, 1)
+
+                is_suspicious, reasons, category, functional_role = _assess_process_suspicion(name, cmdline, cpu_pct, mem_mb, pid)
+
+                created_dt = ""
+                try:
+                    if info.get('create_time'):
+                        created_dt = datetime.datetime.fromtimestamp(info['create_time']).strftime("%H:%M:%S")
+                except Exception:
+                    pass
+
+                can_terminate = (
+                    pid not in PROTECTED_PIDS and 
+                    name.lower() not in PROTECTED_PROCESS_NAMES and 
+                    not is_ragsec_platform_process(name, cmdline, pid)
+                )
+
+                raw_list.append({
+                    "pid": pid,
+                    "name": name,
+                    "status": info.get('status') or "running",
+                    "cpu_percent": cpu_pct,
+                    "memory_mb": mem_mb,
+                    "cmdline": cmdline[:300],
+                    "create_time": created_dt,
+                    "category": category,
+                    "functional_role": functional_role,
+                    "is_suspicious": is_suspicious,
+                    "suspicious_reasons": reasons,
+                    "can_terminate": can_terminate
+                })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
-            if filter == "high_cpu" and cpu_pct < 10.0:
+        _process_cache = {"timestamp": time.time(), "raw_processes": raw_list}
+
+    # Filter and sort
+    filtered_list = []
+    suspicious_count = 0
+    search_q = search.lower().strip() if search else None
+
+    for p in raw_list:
+        if p["is_suspicious"]:
+            suspicious_count += 1
+
+        if search_q:
+            if (search_q not in p["name"].lower() and 
+                search_q not in str(p["pid"]) and 
+                search_q not in p["cmdline"].lower() and
+                search_q not in p["functional_role"].lower()):
                 continue
 
-            created_dt = ""
-            try:
-                if info.get('create_time'):
-                    created_dt = datetime.datetime.fromtimestamp(info['create_time']).strftime("%H:%M:%S")
-            except Exception:
-                pass
-
-            can_terminate = (
-                pid not in PROTECTED_PIDS and 
-                name.lower() not in PROTECTED_PROCESS_NAMES and 
-                not is_ragsec_platform_process(name, cmdline, pid)
-            )
-
-            process_list.append({
-                "pid": pid,
-                "name": name,
-                "status": info.get('status') or "running",
-                "cpu_percent": cpu_pct,
-                "memory_mb": mem_mb,
-                "cmdline": cmdline[:300],
-                "create_time": created_dt,
-                "category": category,
-                "functional_role": functional_role,
-                "is_suspicious": is_suspicious,
-                "suspicious_reasons": reasons,
-                "can_terminate": can_terminate
-            })
-
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        if filter == "suspicious" and not p["is_suspicious"]:
+            continue
+        if filter == "high_cpu" and p["cpu_percent"] < 10.0:
             continue
 
+        filtered_list.append(p)
+
     # Sort: platform services first, then suspicious, then CPU, then memory
-    process_list.sort(key=lambda p: (
+    filtered_list.sort(key=lambda p: (
         p['category'] != "RAGSEC_PLATFORM",
         not p['is_suspicious'],
         -p['cpu_percent'],
@@ -285,9 +302,9 @@ def list_running_processes(
 
     return {
         "target_host": target_host,
-        "total_active": len(process_list),
+        "total_active": len(filtered_list),
         "suspicious_count": suspicious_count,
-        "processes": process_list[:limit]
+        "processes": filtered_list[:limit]
     }
 
 

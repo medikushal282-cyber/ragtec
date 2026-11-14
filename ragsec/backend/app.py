@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Clean-slate modular implementation of IEEE RAGSec framework",
+    description="Enterprise modular implementation of RAGSec Threat Intelligence SIEM framework",
     version=settings.APP_VERSION,
     lifespan=lifespan
 )

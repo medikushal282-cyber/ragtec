@@ -1,6 +1,6 @@
 """
 ragsec.backend.connectors.siem_connectors
-Implements Enterprise SIEM and Ticketing Connectors per Section V-D of IEEE RAGSec paper:
+Implements Enterprise SIEM and Ticketing Connectors:
 - ServiceNow Incident Response (SIR)
 - Splunk Enterprise Security (ES) Notable Events
 - Microsoft Sentinel Incidents

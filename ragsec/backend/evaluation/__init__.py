@@ -1,4 +1,4 @@
 """
 ragsec.backend.evaluation
-Evaluation and benchmarking module for the IEEE RAGSec framework.
+Evaluation and benchmarking module for the RAGSec framework.
 """

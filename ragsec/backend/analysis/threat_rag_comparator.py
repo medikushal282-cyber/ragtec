@@ -113,7 +113,7 @@ class ThreatRAGComparator:
         matched_playbook_title = top_match.get("source", top_match.get("source_name", "General CTI Baseline")) if top_match else "Generic Containment Playbook"
         matched_snippet = top_match.get("chunk_text", "")[:320] if top_match else "Standard defensive baseline."
 
-        # 4. Multi-Factor Risk Score Calculation Formula (IEEE Section V)
+        # 4. Multi-Factor Risk Score Calculation Formula (Canonical SIEM Model)
         # R = w_entropy * S_entropy + w_ast * S_ast + w_rag * S_rag + w_proc * S_proc
         entropy_points = min(25.0, max(0.0, (entropy - 4.0) * 8.0)) if entropy > 4.5 else min(10.0, entropy * 2.0)
         ast_signal_points = min(35.0, len(indicators) * 9.0)

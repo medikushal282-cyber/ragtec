@@ -45,7 +45,7 @@ def run_all_tests():
     results = []
     logs = [
         f"[{time.strftime('%H:%M:%S')}] --- Initiating P8 Autonomous Threat & Security Verification Suite ---",
-        f"[{time.strftime('%H:%M:%S')}] Evaluator: IEEE RAGSec Autonomous Benchmark Engine"
+        f"[{time.strftime('%H:%M:%S')}] Evaluator: Enterprise RAGSec Autonomous Benchmark Engine"
     ]
     overall_start = time.perf_counter()
 

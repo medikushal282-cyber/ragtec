@@ -45,7 +45,7 @@ def get_benchmarks(alpha: float = 1.0, beta: float = 1.5, gamma: float = 0.8):
 @router.get("/scenarios")
 def get_scenarios():
     """
-    Returns the 6 IEEE Benchmark Ground-Truth Test Scenarios.
+    Returns the 6 Canonical Benchmark Ground-Truth Test Scenarios.
     """
     return {
         "count": len(BENCHMARK_SCENARIOS),
@@ -56,7 +56,7 @@ def get_scenarios():
 @router.post("/evaluate")
 def evaluate_custom_response(payload: CustomEvaluationPayload):
     """
-    Evaluates any arbitrary query and response pair against IEEE mathematical formulas.
+    Evaluates any arbitrary query and response pair against rigorous mathematical formulas.
     Calculates FA, RS, CI, USR, TE, UTR, and overall SPS.
     """
     if not payload.query.strip() or not payload.response.strip():

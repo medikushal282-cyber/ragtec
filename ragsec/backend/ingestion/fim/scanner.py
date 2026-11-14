@@ -4,7 +4,7 @@ import uuid
 import datetime
 import json
 from domain.soc_models import SecurityEvent, ProvenanceMetadata, CanonicalFields, Incident, IncidentStatus, ThreatClassification, ThreatCategory, ClassificationState, MitigationAction, MitigationStatus
-from db.database import save_record, get_all_records, get_record
+from db.database import save_record, get_all_records, get_record, save_file_analysis
 from domain.audit import audit_service
 from pipeline.threat_analyzer import threat_analyzer, safe_read_snippet
 
@@ -29,11 +29,12 @@ def generate_fim_event(filepath: str, action: str, file_hash: str = '') -> Secur
 
     event_id = f'evt_{uuid.uuid4().hex[:8]}'
     is_suspicious = analysis['is_threat']
-    risk_score = 95 if is_suspicious else 10
+    risk_score = analysis.get('risk_score', 95 if is_suspicious else 10)
 
     cls_name = analysis["classification"]
     sev_name = analysis["severity"]
-    raw_message = f"FIM: File {action.upper()} detected at {filepath} (Risk: {risk_score}, Category: {cls_name})"
+    filename = os.path.basename(filepath)
+    raw_message = f"Continuous CRUD Guard: [{action.upper()}] {filename} verified as {'UNSAFE' if is_suspicious else 'SAFE'} (Risk: {risk_score}/100, Category: {cls_name})"
 
     event = SecurityEvent(
         id=event_id,
@@ -44,7 +45,7 @@ def generate_fim_event(filepath: str, action: str, file_hash: str = '') -> Secur
         raw_message=raw_message,
         is_suspicious=is_suspicious,
         provenance=ProvenanceMetadata(
-            source_id='workspace_scanner',
+            source_id='continuous_crud_scanner',
             sensor_type='FIM',
             sensitivity_level='internal',
             retention_policy='90d',
@@ -63,10 +64,44 @@ def generate_fim_event(filepath: str, action: str, file_hash: str = '') -> Secur
     # Attach analysis details into event model dict
     event_dict = event.model_dump()
     event_dict['canonical']['risk_score'] = risk_score
+    event_dict['canonical']['crud_action'] = action.upper()
+    event_dict['canonical']['content_verdict'] = "UNSAFE" if is_suspicious else "SAFE"
     event_dict['threat_analysis'] = analysis
 
     # Save to SQLite events table
     save_record('events', event_id, event_dict)
+
+    # Persist live file analysis to SQLite file_analyses table so UI updates in real-time
+    try:
+        analysis_id = f"ANA-{hashlib.md5(filepath.encode()).hexdigest()[:8].upper()}"
+        file_size = os.path.getsize(filepath) if (os.path.exists(filepath) and not os.path.isdir(filepath)) else 0
+        is_vulnerable = analysis.get("is_vulnerable", False)
+        threat_state = "THREAT" if is_suspicious else ("VULNERABLE" if is_vulnerable else "SAFE")
+        cls_type = "THREAT" if is_suspicious else ("VULNERABLE_CODE" if is_vulnerable else "BENIGN")
+
+        save_file_analysis({
+            "analysis_id": analysis_id,
+            "filename": filename,
+            "file_type": os.path.splitext(filename)[1] or "file",
+            "file_size": file_size,
+            "sha256": file_hash or "hash_deleted",
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            "data_source": "continuous_crud_service",
+            "classification": cls_type,
+            "threat_category": cls_name,
+            "threat_state": threat_state,
+            "severity": sev_name.lower(),
+            "risk_score": risk_score,
+            "entropy": analysis.get("entropy", 0.0),
+            "rationale": analysis["rationale"],
+            "ai_analysis": analysis["rationale"],
+            "ai_provider": "Continuous FIM CRUD Guard",
+            "vulnerability_details": analysis.get("vulnerability_details"),
+            "mitigation_options": analysis.get("mitigation_options", []),
+            "suggested_patch": analysis.get("suggested_patch")
+        })
+    except Exception as e:
+        print(f"[FIM Guard] Failed to save file analysis: {e}")
 
     # If suspicious, automatically generate an Incident and Mitigation Actions in SQLite
     if is_suspicious:
@@ -124,8 +159,9 @@ def scan_workspace(directory: str):
     for e in existing_events:
         if isinstance(e, dict):
             c = e.get('canonical') or {}
-            fp = c.get('file_path', '').lower()
-            h = c.get('file_hash_sha256', '')
+            fp_raw = c.get('file_path') or ''
+            fp = fp_raw.lower() if isinstance(fp_raw, str) else ''
+            h = c.get('file_hash_sha256') or ''
             if fp:
                 existing_map[fp] = (e.get('id'), h, e.get('status'))
 

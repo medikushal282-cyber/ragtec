@@ -2,13 +2,14 @@ import datetime
 import hashlib
 import json
 import uuid
+import threading
 from typing import Optional, List
 from domain.soc_models import AuditEvent
 import db.database as db
 
 class AuditService:
     def __init__(self):
-        pass
+        self._lock = threading.Lock()
 
     def _canonicalize(self, event_data: dict) -> bytes:
         # Canonicalize the event data before hashing
@@ -17,65 +18,77 @@ class AuditService:
         return json.dumps(payload, sort_keys=True).encode("utf-8")
 
     def _get_latest_audit(self) -> Optional[AuditEvent]:
-        records = db.get_all_records("audit_logs")
-        if not records:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute("SELECT data FROM audit_logs ORDER BY rowid DESC LIMIT 1")
+        row = c.fetchone()
+        conn.close()
+        if not row:
             return None
-        # Sort by timestamp to get the last one
-        sorted_records = sorted(records, key=lambda x: x["timestamp"])
-        return AuditEvent(**sorted_records[-1])
+        return AuditEvent(**json.loads(row["data"]))
 
     def log_event(self, actor: str, action: str, target: str, result: str, evidence_ref: Optional[str] = None) -> AuditEvent:
-        latest = self._get_latest_audit()
-        prev_hash = latest.current_hash if latest else None
+        with self._lock:
+            latest = self._get_latest_audit()
+            prev_hash = latest.current_hash if latest else None
 
-        event = AuditEvent(
-            id=f"AUD-{uuid.uuid4().hex[:6].upper()}",
-            actor=actor,
-            action=action,
-            target=target,
-            result=result,
-            evidence_ref=evidence_ref,
-            previous_hash=prev_hash
-        )
+            event = AuditEvent(
+                id=f"AUD-{uuid.uuid4().hex[:6].upper()}",
+                actor=actor,
+                action=action,
+                target=target,
+                result=result,
+                evidence_ref=evidence_ref,
+                previous_hash=prev_hash
+            )
 
-        payload = event.model_dump()
-        payload.pop("current_hash", None)
-        canonical = self._canonicalize(payload)
-        hash_input = (prev_hash or "") + canonical.decode("utf-8")
-        event.current_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
-
-        db.save_record("audit_logs", event.id, event.model_dump())
-        return event
-
-    def get_audit_trail(self) -> List[AuditEvent]:
-        records = db.get_all_records("audit_logs")
-        sorted_records = sorted(records, key=lambda x: x["timestamp"])
-        return [AuditEvent(**r) for r in sorted_records]
-
-    def verify_chain(self) -> str:
-        records = db.get_all_records("audit_logs")
-        if not records:
-            return "VALID"
-        
-        sorted_records = sorted(records, key=lambda x: x["timestamp"])
-        prev_hash = None
-        
-        for i, rec in enumerate(sorted_records):
-            ev = AuditEvent(**rec)
-            if ev.previous_hash != prev_hash:
-                return f"INVALID: Broken previous-hash link at {ev.id}"
-            
-            payload = dict(rec)
+            payload = event.model_dump()
             payload.pop("current_hash", None)
             canonical = self._canonicalize(payload)
             hash_input = (prev_hash or "") + canonical.decode("utf-8")
-            expected_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+            event.current_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+
+            db.save_record("audit_logs", event.id, event.model_dump())
+            return event
+
+    def get_audit_trail(self) -> List[AuditEvent]:
+        conn = db.get_connection()
+        c = conn.cursor()
+        c.execute("SELECT data FROM audit_logs ORDER BY rowid ASC")
+        rows = c.fetchall()
+        conn.close()
+        return [AuditEvent(**json.loads(r["data"])) for r in rows]
+
+    def verify_chain(self) -> str:
+        with self._lock:
+            conn = db.get_connection()
+            c = conn.cursor()
+            c.execute("SELECT rowid, data FROM audit_logs ORDER BY rowid ASC")
+            rows = c.fetchall()
+            conn.close()
+
+            if not rows:
+                return "VALID"
             
-            if ev.current_hash != expected_hash:
-                return f"INVALID: Modified hash or payload at {ev.id}"
+            prev_hash = None
+            
+            for r in rows:
+                rec = json.loads(r["data"])
+                ev = AuditEvent(**rec)
+                if ev.previous_hash != prev_hash:
+                    return f"INVALID: Broken previous-hash link at {ev.id}"
                 
-            prev_hash = ev.current_hash
-            
-        return "VALID"
+                payload = dict(rec)
+                payload.pop("current_hash", None)
+                canonical = self._canonicalize(payload)
+                hash_input = (prev_hash or "") + canonical.decode("utf-8")
+                expected_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+                
+                if ev.current_hash != expected_hash:
+                    return f"INVALID: Modified hash or payload at {ev.id}"
+                    
+                prev_hash = ev.current_hash
+                
+            return "VALID"
 
 audit_service = AuditService()

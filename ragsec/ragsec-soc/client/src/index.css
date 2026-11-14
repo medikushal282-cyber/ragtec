@@ -1,59 +1,243 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 
 :root { 
-  font-family: 'Space Grotesk', sans-serif; 
-  color: #F8FAFC; 
-  background: #060911; 
-  --cyan: #00F0FF; 
-  --blue: #3B82F6; 
-  --lime: #10B981; 
-  --red: #F43F5E; 
-  --muted: #94A3B8; 
-  --panel: #0D1322; 
-  --line: rgba(255, 255, 255, 0.08); 
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif; 
+  color: #F5F5F7; 
+  background: #080A10; 
+  --apple-blue: #0A84FF;
+  --apple-indigo: #5E5CE6;
+  --apple-green: #30D158;
+  --apple-orange: #FF9F0A;
+  --apple-red: #FF453A;
+  --apple-gray: #8E8E93;
+  --apple-gray2: #636366;
+  --apple-bg: #080A10;
+  --apple-surface: rgba(22, 26, 38, 0.65);
+  --apple-border: rgba(255, 255, 255, 0.08);
+  --apple-highlight: rgba(255, 255, 255, 0.15);
 }
 
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #060911; color: #F8FAFC; }
-button, input, textarea { font: inherit; }
-button { cursor: pointer; }
+* { 
+  box-sizing: border-box; 
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-/* Custom Scrollbars */
+body { 
+  margin: 0; 
+  min-width: 320px; 
+  background: #080A10; 
+  color: #F5F5F7; 
+  overflow-x: hidden;
+}
+
+button, input, textarea, select { 
+  font: inherit; 
+}
+
+button { 
+  cursor: pointer; 
+}
+
+/* Subtle, refined macOS-style Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(6, 9, 17, 0.8);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
+  transition: background 150ms ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--cyan);
+  background: rgba(255, 255, 255, 0.25);
 }
 
-.glass-panel {
-  background: rgba(13, 19, 34, 0.75);
+/* Apple Translucent Glass Materials */
+.glass-panel, .apple-panel {
+  background: rgba(18, 22, 34, 0.65);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+  border-radius: 1rem;
+}
+
+.apple-panel-subtle {
+  background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.875rem;
 }
 
-@keyframes pulseGlow {
+/* Direct Manipulation Instant Feedback */
+.apple-button {
+  transition: transform 100ms cubic-bezier(0.2, 0, 0, 1), background-color 150ms ease, opacity 150ms ease;
+  user-select: none;
+}
+.apple-button:active {
+  transform: scale(0.97);
+}
+
+/* Optical Typography Utilities */
+.apple-display {
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
+.apple-headline {
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.apple-subhead {
+  letter-spacing: -0.005em;
+  color: #8E8E93;
+}
+
+/* Smooth Pulse Indicators */
+@keyframes applePulse {
   0%, 100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7);
+    transform: scale(1);
   }
   50% {
-    opacity: 0.8;
-    box-shadow: 0 0 0 8px rgba(0, 240, 255, 0);
+    opacity: 0.5;
+    transform: scale(0.92);
   }
 }
 
 .pulse-dot {
-  animation: pulseGlow 2s infinite;
+  animation: applePulse 2.4s ease-in-out infinite;
+}
+
+/* ========================================================================= */
+/* PEARLESCENT FLOATING NOTIFICATIONS (Top-Right Dismissable)                 */
+/* ========================================================================= */
+.pearlescent-surface {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(240, 246, 255, 0.92) 25%,
+    rgba(255, 238, 250, 0.94) 62%,
+    rgba(235, 250, 255, 0.97) 100%
+  );
+  backdrop-filter: blur(28px) saturate(220%);
+  -webkit-backdrop-filter: blur(28px) saturate(220%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 22px 45px -8px rgba(0, 0, 0, 0.5),
+    0 0 35px rgba(215, 235, 255, 0.45),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+  border-radius: 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.pearlescent-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 240%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 40%,
+    rgba(255, 225, 245, 0.35) 50%,
+    rgba(215, 248, 255, 0.42) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: pearlescentGleam 7s ease-in-out infinite;
+}
+
+@keyframes pearlescentGleam {
+  0% { transform: translateX(-60%); opacity: 0; }
+  15% { opacity: 0.9; }
+  45% { transform: translateX(60%); opacity: 0.9; }
+  60%, 100% { opacity: 0; transform: translateX(60%); }
+}
+
+/* Style for native Sonner toasts */
+[data-sonner-toaster] [data-sonner-toast] {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(240, 246, 255, 0.92) 25%,
+    rgba(255, 238, 250, 0.94) 62%,
+    rgba(235, 250, 255, 0.97) 100%
+  ) !important;
+  color: #0F172A !important;
+  backdrop-filter: blur(28px) saturate(220%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(220%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow:
+    0 22px 45px -8px rgba(0, 0, 0, 0.5),
+    0 0 35px rgba(215, 235, 255, 0.45),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95) !important;
+  border-radius: 1.15rem !important;
+  font-family: inherit !important;
+  padding: 1rem 1.25rem !important;
+}
+
+[data-sonner-toaster] [data-title] {
+  color: #0F172A !important;
+  font-weight: 600 !important;
+  font-size: 0.8125rem !important;
+  letter-spacing: -0.01em !important;
+}
+
+[data-sonner-toaster] [data-description] {
+  color: #334155 !important;
+  font-size: 0.75rem !important;
+}
+
+[data-sonner-toaster] [data-button] {
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  border-radius: 0.75rem !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  padding: 0.4rem 0.85rem !important;
+  transition: all 150ms ease !important;
+}
+
+[data-sonner-toaster] [data-button]:hover {
+  background: #1E293B !important;
+  transform: scale(1.02) !important;
+}
+
+[data-sonner-toaster] [data-close-button] {
+  background: rgba(15, 23, 42, 0.1) !important;
+  color: #0F172A !important;
+  border: 1px solid rgba(15, 23, 42, 0.15) !important;
+  border-radius: 9999px !important;
+  top: 10px !important;
+  right: 10px !important;
+}
+
+[data-sonner-toaster] [data-close-button]:hover {
+  background: rgba(15, 23, 42, 0.2) !important;
+  transform: scale(1.08) !important;
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

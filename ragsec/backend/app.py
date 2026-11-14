@@ -16,8 +16,12 @@ from api.sps_routes import router as sps_router
 from api.siem_routes import router as siem_router
 from api.governance_routes import router as governance_router
 from api.active_threat_routes import router as active_threat_router
+from api.threat_lab_routes import router as threat_lab_router
+from api.step_helper_routes import router as step_helper_router
+from api.process_routes import router as process_router
+from api.fleet_routes import router as fleet_router
 from analysis.active_threat_detector import active_threat_detector
-from config import settings
+from config import settings, get_canonical_workspace_dir
 
 from contextlib import asynccontextmanager
 from ingestion.fim.watcher import FIMWatcher
@@ -25,11 +29,12 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize real filesystem FIM watcher on the monitored workspace directory
-    workspace_dir = os.environ.get("RAGSEC_MONITORED_DIR", os.path.abspath(os.path.join(os.getcwd(), "..", "..", "monitored_workspace")))
+    # Initialize real filesystem FIM watcher on the canonical monitored workspace directory
+    workspace_dir = get_canonical_workspace_dir()
     os.makedirs(workspace_dir, exist_ok=True)
     os.makedirs(os.path.join(workspace_dir, ".quarantine"), exist_ok=True)
     os.makedirs(os.path.join(workspace_dir, "replication_sandbox"), exist_ok=True)
+    os.makedirs(os.path.join(workspace_dir, "threat_lab"), exist_ok=True)
     watcher = FIMWatcher(workspace_dir)
     watcher.start()
 
@@ -68,6 +73,10 @@ app.include_router(sps_router)
 app.include_router(siem_router)
 app.include_router(governance_router)
 app.include_router(active_threat_router)
+app.include_router(threat_lab_router)
+app.include_router(step_helper_router)
+app.include_router(process_router)
+app.include_router(fleet_router)
 
 @app.get("/")
 def root_status():
@@ -79,4 +88,8 @@ def root_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+    import sys
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+    uvicorn.run("app:app", app_dir=backend_dir, host="127.0.0.1", port=settings.PORT, reload=settings.DEBUG)

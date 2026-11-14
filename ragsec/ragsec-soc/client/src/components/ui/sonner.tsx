@@ -7,14 +7,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      position="top-right"
+      closeButton={true}
       className="toaster group"
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-        } as React.CSSProperties
-      }
+      toastOptions={{
+        className: "pearlescent-toast shadow-2xl",
+      }}
       {...props}
     />
   );

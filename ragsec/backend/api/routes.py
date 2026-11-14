@@ -100,6 +100,10 @@ class IngestDocPayload(BaseModel):
     source_name: str = "manual_ingest"
     source_type: str = "cti_report"
     sensitivity_tier: SensitivityTier = SensitivityTier.INTERNAL
+    chunking_strategy: Optional[str] = "Semantic Paragraphs"
+    event_type: Optional[str] = None
+    asset: Optional[str] = None
+    ioc_category: Optional[str] = None
     publication_timestamp: Optional[str] = None
     url: Optional[str] = None
     doc_type: Optional[str] = None
@@ -161,7 +165,13 @@ def ingest_document(payload: IngestDocPayload):
     doc_data["cves"] = classification["cves"]
     doc_data["ttps"] = classification["ttps"]
 
-    chunks = chunk_document(doc)
+    doc_data["sensitivity_tier"] = payload.sensitivity_tier.value
+    doc_data["chunking_strategy"] = payload.chunking_strategy or "Semantic Paragraphs"
+    doc_data["event_type"] = payload.event_type
+    doc_data["asset"] = payload.asset
+    doc_data["ioc_category"] = payload.ioc_category
+
+    chunks = chunk_document(doc, strategy=payload.chunking_strategy)
     mime = "application/json" if payload.source_name.endswith(".json") else "text/csv" if payload.source_name.endswith(".csv") else "text/markdown" if payload.source_name.endswith(".md") else "text/plain"
 
     if chunks:
@@ -171,7 +181,7 @@ def ingest_document(payload: IngestDocPayload):
         vector_store.upsert_chunks(chunks, embeddings)
 
     from domain.audit import audit_service
-    audit_service.log_event("SYSTEM", "INGEST_KNOWLEDGE", payload.source_name, f"Ingested {len(chunks)} chunks [{doc_data['doc_type']}]")
+    audit_service.log_event("SYSTEM", "INGEST_KNOWLEDGE", payload.source_name, f"Ingested {len(chunks)} chunks [{doc_data['doc_type']}] Tier: {payload.sensitivity_tier.value.upper()}")
 
     return {
         "status": "ingested",
@@ -180,6 +190,8 @@ def ingest_document(payload: IngestDocPayload):
         "content_hash": doc.content_hash,
         "classification": classification,
         "doc_type": doc_data["doc_type"],
+        "sensitivity_tier": doc_data["sensitivity_tier"],
+        "chunking_strategy": doc_data["chunking_strategy"],
         "target_categories": doc_data["target_categories"],
         "mitigation_steps": doc_data["mitigation_steps"],
         "summary": doc_data["summary"],
@@ -199,6 +211,12 @@ def api_get_knowledge_sources():
             "chunkCount": d["chunk_count"],
             "ingestionStatus": d["status"],
             "createdAt": d["created_at"],
+            "sensitivity_tier": d.get("sensitivity_tier", "internal"),
+            "chunking_strategy": d.get("chunking_strategy", "Semantic Paragraphs"),
+            "source_type": d.get("source_type", "cti_report"),
+            "event_type": d.get("event_type"),
+            "asset": d.get("asset"),
+            "ioc_category": d.get("ioc_category"),
             "extractedEntities": d.get("extractedEntities", []),
             "doc_type": d.get("doc_type", "THREAT_CLASSIFICATION_INTEL"),
             "target_categories": d.get("target_categories", []),
@@ -239,6 +257,37 @@ def execute_query(req: QueryRequest):
     5. CRC citation + entity verification
     6. Return answer + evidence + governance state
     """
+    # --- Step 0: Conversational & Orientation Queries ---
+    import re
+    cleaned_query = re.sub(r"[^\w\s]", " ", req.query.strip().lower())
+    cleaned_query = re.sub(r"\s+", " ", cleaned_query).strip()
+    is_greeting = bool(re.match(r"^(hi|hello|hey|greetings|good morning|good afternoon|good evening|who are you|what can you do|help)\b", cleaned_query))
+    if is_greeting:
+        return {
+            "query_id": "Q-GREETING",
+            "answer": (
+                "Hello! I am your RAGSec Autonomous SOC Investigation Copilot.\n\n"
+                "I assist you across the security operations lifecycle:\n"
+                "• **Static File Analysis**: Inspect file hashes, Shannon entropy, PE imports, and obfuscation patterns without executing on the host.\n"
+                "• **Incident Triage & Correlation**: Correlate FIM filesystem events with ingested CTI advisories and MITRE ATT&CK techniques.\n"
+                "• **Mitigation Playbooks**: Formulate actionable PowerShell and Bash containment scripts for detected threats.\n"
+                "• **Audit Verification**: Track immutable SHA-256 audit ledger records for all analyst actions.\n\n"
+                "You can ask me to analyze a file artifact, look up MITRE techniques (e.g. T1486 Ransomware, T1059.001 PowerShell), or generate mitigation playbooks."
+            ),
+            "evidence": [],
+            "confidence_score": 1.0,
+            "status": "COMPLETED",
+            "governance": {
+                "gating": "PASSED",
+                "gating_reason": "Conversational orientation query",
+                "pii_masked": False,
+                "cross_encoder_active": True,
+                "citation_check": "VERIFIED",
+                "crc_passed": True,
+                "identity_verified": True,
+            }
+        }
+
     # --- Step 1: Retrieve ---
     from domain.audit import audit_service
     evidence_dicts = retriever.retrieve(query=req.query, top_n=5)

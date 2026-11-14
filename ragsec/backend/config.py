@@ -31,12 +31,12 @@ class Settings(BaseSettings):
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     
     # LLM Settings (Local Ollama, Groq, OpenRouter, Google Gemini)
-    LLM_PROVIDER: str = "ollama" # "ollama" | "groq" | "openrouter" | "gemini" | "mock"
-    LLM_MODEL: str = "llama3.1"
+    LLM_PROVIDER: str = "groq" # "ollama" | "groq" | "openrouter" | "gemini" | "mock"
+    LLM_MODEL: str = "openai/gpt-oss-120b"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     GOOGLE_API_KEY: str = ""
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct"
     
@@ -59,3 +59,29 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 settings = Settings()
+
+def get_canonical_workspace_dir() -> str:
+    """
+    Returns the canonical absolute path to monitored_workspace.
+    Always resolves deterministically to the root monitored_workspace directory.
+    """
+    env_dir = os.environ.get("RAGSEC_MONITORED_DIR")
+    if env_dir and os.path.exists(env_dir):
+        return os.path.abspath(env_dir)
+    
+    backend_dir = Path(__file__).resolve().parent
+    # Search root (C:\Projects\RAGTEC) first, then parents
+    candidates = [
+        backend_dir.parent.parent / "monitored_workspace",
+        backend_dir.parent / "monitored_workspace",
+        Path.cwd() / "monitored_workspace",
+        Path.cwd().parent / "monitored_workspace"
+    ]
+    for c in candidates:
+        if c.exists() and c.is_dir():
+            return str(c.resolve())
+            
+    default_ws = backend_dir.parent.parent / "monitored_workspace"
+    default_ws.mkdir(parents=True, exist_ok=True)
+    return str(default_ws.resolve())
+

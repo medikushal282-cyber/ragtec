@@ -49,7 +49,18 @@ class Generator:
         # 1. Try Groq API
         if (selected_provider == "groq" or (api_key and "gsk_" in api_key)) and (api_key or settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY")):
             groq_key = api_key or settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
-            groq_model = model or settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+            raw_model = model or settings.GROQ_MODEL or "openai/gpt-oss-120b"
+            rm_lower = raw_model.lower().strip()
+            if "120b" in rm_lower:
+                groq_model = "openai/gpt-oss-120b"
+            elif "safeguard" in rm_lower:
+                groq_model = "openai/gpt-oss-safeguard-20b"
+            elif "20b" in rm_lower:
+                groq_model = "openai/gpt-oss-20b"
+            elif "qwen" in rm_lower and "distill" not in rm_lower:
+                groq_model = "qwen/qwen3.8-27b"
+            else:
+                groq_model = raw_model.strip()
             if groq_key:
                 try:
                     chat_msgs = []

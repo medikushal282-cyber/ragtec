@@ -119,6 +119,7 @@ Prescribes response workflows for detecting and neutralizing unauthorized PowerS
         "source_name": "SOC_Playbook_Host_Isolation.md",
         "source_type": "internal_sop",
         "sensitivity_tier": SensitivityTier.INTERNAL,
+        "chunking_strategy": "Semantic Paragraphs",
         "doc_type": "INCIDENT_RESPONSE_PLAYBOOK",
         "content": """# Enterprise Endpoint Isolation & Preservation Playbook
 ## Protocol Overview
@@ -137,6 +138,54 @@ When a host is classified as infected by high-risk Malware, Ransomware, or activ
 
 4. **Cryptographic Audit Ledger Record**:
    - Record analyst identity, target host ID, timestamp, and SHA-256 signature into the immutable audit trail."""
+    },
+    {
+        "title": "Sigma / YARA Advanced Behavioral Rule Blocks",
+        "source_name": "Sigma_YARA_Detection_Rules.yar",
+        "source_type": "rule",
+        "sensitivity_tier": SensitivityTier.CONFIDENTIAL,
+        "chunking_strategy": "Rule Blocks",
+        "doc_type": "DETECTION_RULESET",
+        "content": """rule Suspicious_AMSI_Bypass_Memory_Patch {
+    meta:
+        description = "Detects in-memory patching of amsi.dll amsiInitFailed flag (T1562.001)"
+        author = "RAGSec Threat Lab"
+        severity = "HIGH"
+        cwe = "CWE-284"
+    strings:
+        $amsi1 = "AmsiUtils" ascii wide nocase
+        $amsi2 = "amsiInitFailed" ascii wide nocase
+        $patch = { 48 B8 ?? ?? ?? ?? ?? ?? ?? ?? C3 }
+    condition:
+        all of ($amsi*) or $patch
+}
+
+rule LockBit_Shadow_Copy_Invalidation_Cmd {
+    meta:
+        description = "Detects execution of vssadmin and bcdedit inhibiting recovery (T1490)"
+        author = "RAGSec Threat Lab"
+        severity = "CRITICAL"
+    strings:
+        $cmd1 = "vssadmin.exe delete shadows /all /quiet" ascii wide nocase
+        $cmd2 = "bcdedit /set {default} recoveryenabled No" ascii wide nocase
+        $cmd3 = "wbadmin delete catalog -quiet" ascii wide nocase
+    condition:
+        2 of them
+}"""
+    },
+    {
+        "title": "Active Zero-Day Compromised IOC Feeds (Restricted)",
+        "source_name": "Compromised_IOC_Table_Feed.csv",
+        "source_type": "csv",
+        "sensitivity_tier": SensitivityTier.RESTRICTED,
+        "chunking_strategy": "IOC Table Rows",
+        "doc_type": "IOC_INTEL_TABLE",
+        "content": """indicator,indicator_type,threat_actor,mitre_ttp,confidence,action
+45.142.214.18,IP,APT29 Cozy Bear,T1071.001,0.99,BLOCK_PERIMETER_EGRESS
+198.51.100.42,IP,LockBit Affiliate,T1486,0.98,ISOLATE_AND_RESET
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,SHA256,CL0P Ransomware,T1190,0.95,QUARANTINE_ENCLAVE
+badguy-command.xyz,Domain,Cobalt Strike Operator,T1071.001,0.96,SINKHOLE_DNS
+mimikatz.exe,FileName,LAPSUS$ Group,T1003.001,0.99,PHYSICAL_KILL_SUSPEND"""
     }
 ]
 
@@ -164,6 +213,8 @@ def seed_database():
         
         doc_data = doc.model_dump()
         doc_data["doc_type"] = item["doc_type"]
+        doc_data["sensitivity_tier"] = item["sensitivity_tier"].value
+        doc_data["chunking_strategy"] = item.get("chunking_strategy", "Semantic Paragraphs")
         doc_data["target_categories"] = classification["target_categories"]
         doc_data["primary_category"] = classification["primary_category"]
         doc_data["mitigation_steps"] = classification["mitigation_steps"]
@@ -172,12 +223,12 @@ def seed_database():
         doc_data["cves"] = classification["cves"]
         doc_data["ttps"] = classification["ttps"]
         
-        # 3. Chunk document
-        chunks = chunk_document(doc)
-        print(f"    -> Extracted {len(chunks)} canonical chunks")
+        # 3. Chunk document with hybrid strategy
+        chunks = chunk_document(doc, strategy=item.get("chunking_strategy"))
+        print(f"    -> Extracted {len(chunks)} canonical chunks [{item.get('chunking_strategy', 'Semantic Paragraphs')}]")
         
         if chunks:
-            mime = "text/markdown"
+            mime = "text/csv" if item["source_name"].endswith(".csv") else "text/x-yara" if item["source_name"].endswith(".yar") else "text/markdown"
             save_knowledge_document(doc.document_id, item["source_name"], mime, chunks, doc_data)
             
             # 4. Generate embeddings and upsert to ChromaDB

@@ -96,6 +96,29 @@ export const appRouter = router({
         return { status: "ERROR", detail: e.message };
       }
     }),
+    deleteFile: publicProcedure.input(z.object({ filePath: z.string().optional(), fileName: z.string().optional() })).mutation(async ({ input, ctx }) => {
+      try {
+        const res = await fetch("http://localhost:8000/api/fim/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_path: input.filePath,
+            filePath: input.filePath,
+            file_name: input.fileName,
+            fileName: input.fileName
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          await appendAudit(ctx.user?.id || "ANALYST", "DELETE_FILE", input.filePath || input.fileName || "unknown", data.status);
+          return data;
+        }
+        const err = await res.json();
+        return { status: "ERROR", detail: err.detail || "File deletion failed" };
+      } catch (e: any) {
+        return { status: "ERROR", detail: e.message };
+      }
+    }),
     restoreFile: publicProcedure.input(z.object({ quarantinePath: z.string(), originalPath: z.string() })).mutation(async ({ input, ctx }) => {
       try {
         const res = await fetch("http://localhost:8000/api/fim/restore", {

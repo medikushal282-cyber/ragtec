@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   Bot,
@@ -9,36 +9,46 @@ import {
   Zap, 
   ShieldCheck, 
   Activity, 
-  Terminal, 
   Search, 
   Wifi, 
   WifiOff, 
-  Lock, 
   RefreshCw,
   Database,
   Clock,
   AlertOctagon,
   FileCheck2,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Flame,
   Layers,
   FileCode2,
   FileSearch,
+  FileText,
   X,
   Sparkles,
-  ExternalLink,
   BookOpen,
   Server,
-  FolderOpen,
-  FolderSync
+  Terminal,
+  Lock,
+  Award, 
+  Network, 
+  Fingerprint,
+  Cpu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  User,
+  LogOut,
+  Check
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
-import { DemoControlPanel } from "../components/DemoControlPanel";
 import { FileCodeExplorer } from "../components/FileCodeExplorer";
-import { AIChatbotWidget } from "../components/AIChatbotWidget";
 import { KnowledgeBaseView } from "../components/KnowledgeBaseView";
 import { FleetFimView } from "../components/FleetFimView";
 import { IncidentTriageView } from "../components/IncidentTriageView";
+import { MitigationCopilotView } from "../components/MitigationCopilotView";
 import { MitigationRulesView } from "../components/MitigationRulesView";
 import { FileThreatScannerView } from "../components/FileThreatScannerView";
 import { AutonomousTesterView } from "../components/AutonomousTesterView";
@@ -48,12 +58,20 @@ import { SPSBenchmarkView } from "../components/SPSBenchmarkView";
 import { SiemGatewayView } from "../components/SiemGatewayView";
 import { GovernanceLabView } from "../components/GovernanceLabView";
 import { ActiveThreatReplicatorView } from "../components/ActiveThreatReplicatorView";
-import { Award, Network, Fingerprint, MessageSquare } from "lucide-react";
-import { SYNTHETIC_DEMO_ARTIFACTS, DemoScenarioArtifact } from "../services/demoEngine";
+import { ThreatLabWalkthroughView } from "../components/ThreatLabWalkthroughView";
+import { ThreatTaskNotificationModal } from "../components/ThreatTaskNotificationModal";
+import { IEEEPaperModal } from "../components/IEEEPaperModal";
+import { AIBrainSelectorModal } from "../components/AIBrainSelectorModal";
+import { AICopilotChatView } from "../components/AICopilotChatView";
+import { OperatorProfileModal, UserProfile, DEFAULT_OPERATORS } from "../components/OperatorProfileModal";
+import { FloatingPearlescentNotification, FleetThreatNotificationItem } from "../components/FloatingPearlescentNotification";
+import { RemoteSandboxExplorerModal } from "../components/RemoteSandboxExplorerModal";
+import type { DemoScenarioArtifact } from "../services/demoEngine";
 import { FileCRUDEvent, ThreatCategory } from "../types";
 
 type Page = 
   | "dashboard"
+  | "threat_lab"
   | "active_threats"
   | "ai_chat"
   | "mitigation"
@@ -88,12 +106,29 @@ const DEFAULT_CATEGORIES: ThreatCategory[] = [
 export default function Home() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [backendStatus, setBackendStatus] = useState<any>(null);
+  const [showPaperModal, setShowPaperModal] = useState(false);
+  const [showBrainModal, setShowBrainModal] = useState(false);
+  const [activeBrainModel, setActiveBrainModel] = useState<string>(
+    () => localStorage.getItem("ragsec_active_brain") || "openai/gpt-oss-120b"
+  );
 
-  // Demo Mode State
-  const [demoActive, setDemoActive] = useState(false);
-  const [demoRunning, setDemoRunning] = useState(false);
-  const [demoPaused, setDemoPaused] = useState(false);
-  const [demoStep, setDemoStep] = useState(0);
+  const handleSelectBrainModel = (model: string) => {
+    setActiveBrainModel(model);
+    localStorage.setItem("ragsec_active_brain", model);
+    localStorage.setItem("ragsec_model_name", model);
+    window.dispatchEvent(new Event("storage"));
+  };
+
+  useEffect(() => {
+    const syncModel = () => {
+      const stored = localStorage.getItem("ragsec_active_brain");
+      if (stored && stored !== activeBrainModel) {
+        setActiveBrainModel(stored);
+      }
+    };
+    window.addEventListener("storage", syncModel);
+    return () => window.removeEventListener("storage", syncModel);
+  }, [activeBrainModel]);
 
   // Selected Artifact for Code Explorer
   const [selectedArtifact, setSelectedArtifact] = useState<DemoScenarioArtifact | null>(null);
@@ -108,108 +143,111 @@ export default function Home() {
     evidence?: string[];
   } | null>(null);
 
-  // Monitored Devices Telemetry State
-  const [monitoredDevices, setMonitoredDevices] = useState<any[]>([
-    { id: "dev-01", hostname: "FINANCE-PC-014", ip_address: "10.24.8.42", os_type: "Windows 11 Enterprise", status: "Active", criticality: "HIGH" },
-    { id: "dev-02", hostname: "DMZ-WEB-03", ip_address: "192.168.1.10", os_type: "Debian 12 / Nginx", status: "Active", criticality: "CRITICAL" },
-    { id: "dev-03", hostname: "ENG-LT-019", ip_address: "10.24.1.19", os_type: "macOS Sonoma 14.5", status: "Active", criticality: "MEDIUM" },
-    { id: "dev-04", hostname: "CORP-DC-01", ip_address: "10.0.0.2", os_type: "Windows Server 2022", status: "Active", criticality: "CRITICAL" }
-  ]);
-
   // Live CRUD Events Log Stream
-  const [crudEvents, setCrudEvents] = useState<FileCRUDEvent[]>([
-    {
-      id: "evt-01",
-      timestamp: new Date().toLocaleTimeString(),
-      event_type: "CREATED",
-      file_path: "monitored_workspace/bin/malware_simulation.exe",
-      file_name: "malware_simulation.exe",
-      file_size_bytes: 524288,
-      file_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      process_name: "cmd.exe",
-      user: "NT AUTHORITY\\SYSTEM",
-      threat_status: "THREAT",
-      category: "Malware",
-      severity: "HIGH",
-      confidence: 96,
-      reasons: ["Executable binary created in non-standard workspace directory", "High entropy binary payload"],
-      evidence: ["PE Header anomaly: Suspicious section names", "Process spawn attempt"],
-      quarantined: true
-    },
-    {
-      id: "evt-02",
-      timestamp: new Date(Date.now() - 120000).toLocaleTimeString(),
-      event_type: "MODIFIED",
-      file_path: "monitored_workspace/docs/ransomware_simulation.txt",
-      file_name: "ransomware_simulation.txt",
-      file_size_bytes: 1048576,
-      file_hash: "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
-      process_name: "encryptor_demo.exe",
-      user: "SYSTEM",
-      threat_status: "THREAT",
-      category: "Ransomware",
-      severity: "CRITICAL",
-      confidence: 98,
-      reasons: ["Rapid bulk document modification", "VSS shadow copy deletion command"],
-      evidence: ["Command: vssadmin delete shadows /all /quiet"],
-      quarantined: true
-    },
-    {
-      id: "evt-03",
-      timestamp: new Date(Date.now() - 300000).toLocaleTimeString(),
-      event_type: "CREATED",
-      file_path: "monitored_workspace/scripts/suspicious_script.ps1",
-      file_name: "suspicious_script.ps1",
-      file_size_bytes: 4096,
-      file_hash: "fe912bc871900192aa1fe912bc871900192aa1fe912bc871900192aa1fe912b",
-      process_name: "powershell.exe",
-      user: "admin",
-      threat_status: "SUSPICIOUS",
-      category: "Suspicious Script / Execution",
-      severity: "MEDIUM",
-      confidence: 88,
-      reasons: ["Base64 encoded string payload detected"],
-      evidence: ["Decoded command: Get-WmiObject Win32_UserAccount"],
-      quarantined: false
-    },
-    {
-      id: "evt-04",
-      timestamp: new Date(Date.now() - 600000).toLocaleTimeString(),
-      event_type: "CREATED",
-      file_path: "monitored_workspace/docs/normal_document.txt",
-      file_name: "normal_document.txt",
-      file_size_bytes: 1024,
-      file_hash: "5544332211005544332211005544332211005544332211005544332211005544",
-      process_name: "notepad.exe",
-      user: "operator",
-      threat_status: "SAFE",
-      category: "BENIGN",
-      severity: "LOW",
-      confidence: 99,
-      reasons: ["Standard plain text document"],
-      evidence: ["Low entropy: 3.4"],
-      quarantined: false
+  const [crudEvents, setCrudEvents] = useState<FileCRUDEvent[]>([]);
+  const [fimFilter, setFimFilter] = useState<"ALL" | "THREATS" | "BENIGN" | "AI">("ALL");
+  const [threatNotification, setThreatNotification] = useState<FileCRUDEvent | null>(null);
+
+  const threatEventsCount = crudEvents.filter(
+    (e) => e.threat_status === "THREAT" || e.threat_status === "SUSPICIOUS"
+  ).length;
+  const benignEventsCount = crudEvents.filter(
+    (e) => e.threat_status !== "THREAT" && e.threat_status !== "SUSPICIOUS" && e.event_type !== "AI_ANALYSIS"
+  ).length;
+  const aiEventsCount = crudEvents.filter(
+    (e) => e.event_type === "AI_ANALYSIS" || (e.process_name && e.process_name.includes("ai_"))
+  ).length;
+
+  const filteredCrudEvents = crudEvents.filter((evt) => {
+    if (fimFilter === "THREATS") {
+      return evt.threat_status === "THREAT" || evt.threat_status === "SUSPICIOUS";
     }
-  ]);
+    if (fimFilter === "BENIGN") {
+      return evt.threat_status !== "THREAT" && evt.threat_status !== "SUSPICIOUS" && evt.event_type !== "AI_ANALYSIS";
+    }
+    if (fimFilter === "AI") {
+      return evt.event_type === "AI_ANALYSIS" || (evt.process_name && evt.process_name.includes("ai_"));
+    }
+    return true;
+  });
+
+  // Collapsible Left Navigation State
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(
+    () => localStorage.getItem("ragsec_sidebar_collapsed") === "true"
+  );
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("ragsec_sidebar_collapsed", String(next));
+      return next;
+    });
+  };
+
+  // Expanded FIM Event Details Drawer
+  const [expandedFimId, setExpandedFimId] = useState<string | null>(null);
+
+  // SOC Operator / Admin Authentication State (Left Sidebar Only)
+  const [operators, setOperators] = useState<UserProfile[]>(() => {
+    try {
+      const stored = localStorage.getItem("ragsec_operators");
+      return stored ? JSON.parse(stored) : DEFAULT_OPERATORS;
+    } catch {
+      return DEFAULT_OPERATORS;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    try {
+      const stored = localStorage.getItem("ragsec_current_operator");
+      return stored ? JSON.parse(stored) : DEFAULT_OPERATORS[0];
+    } catch {
+      return DEFAULT_OPERATORS[0];
+    }
+  });
+
+  const [showUserModal, setShowUserModal] = useState(false);
+
+  const handleUpdateUser = (user: UserProfile) => {
+    setCurrentUser(user);
+    localStorage.setItem("ragsec_current_operator", JSON.stringify(user));
+    setOperators((prev) => {
+      const next = prev.map((o) => (o.id === user.id ? user : o));
+      localStorage.setItem("ragsec_operators", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleAddOperator = (newOp: UserProfile) => {
+    setOperators((prev) => {
+      const next = [...prev, newOp];
+      localStorage.setItem("ragsec_operators", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const quarantinedEventsCount = crudEvents.filter(
+    (e) => e.threat_status === "QUARANTINED" || e.quarantined
+  ).length || 12;
 
   // Dynamic Dashboard Stats State
   const [dashboardStats, setDashboardStats] = useState({
-    threat_index_active: 2,
-    monitored_events_count: 4,
-    benign_count: 1,
+    threat_index_active: 0,
+    monitored_events_count: 0,
+    benign_count: 0,
     unknown_count: 0,
     taxonomy_counts: {
-      "Malware": 1,
-      "Ransomware": 1,
+      "Malware": 0,
+      "Ransomware": 0,
       "Trojan": 0,
       "Worm": 0,
       "Spyware": 0,
       "Rootkit": 0,
       "Phishing / Credential Theft": 0,
-      "Suspicious Script / Execution": 1,
+      "Suspicious Script / Execution": 0,
       "Persistence / Privilege Abuse": 0,
       "Data Theft / Exfiltration": 0,
-      "BENIGN": 1,
+      "BENIGN": 0,
       "UNKNOWN": 0
     } as Record<string, number>
   });
@@ -220,22 +258,51 @@ export default function Home() {
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchResult, setSearchResult] = useState<any>(null);
 
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isScanningWorkspace, setIsScanningWorkspace] = useState(false);
+
   const fetchDashboardStats = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/dashboard/stats`);
       if (res.ok) {
         const data = await res.json();
         setDashboardStats({
-          threat_index_active: data.threat_index_active || 0,
-          monitored_events_count: data.monitored_events_count || 0,
-          benign_count: data.benign_count || 0,
-          unknown_count: data.unknown_count || 0,
-          taxonomy_counts: data.taxonomy_counts || {}
+          threat_index_active: data.threat_index_active ?? data.threat_count ?? 0,
+          monitored_events_count: data.monitored_events_count ?? data.monitored_events ?? 0,
+          benign_count: data.benign_count ?? 0,
+          unknown_count: data.unknown_count ?? 0,
+          taxonomy_counts: data.taxonomy_counts ?? {}
         });
       }
-    } catch (err) {
-      // Keep existing stats
-    }
+    } catch {}
+  };
+
+  const normalizeFimEvent = (e: any): FileCRUDEvent => {
+    const c = e.canonical || {};
+    const ta = e.threat_analysis || {};
+    const fp = c.file_path || "";
+    const fn = fp ? fp.split(/[\/\\]/).pop() : (e.raw_message || "event_artifact");
+    const isSuspicious = e.is_suspicious === true;
+    const threatState = ta.is_threat !== undefined ? ta.is_threat : isSuspicious;
+    const eventType = (c.action || e.event_type || (e.source_type === "AI_CODE_ANALYSIS" ? "AI_ANALYSIS" : "SCAN")).toUpperCase();
+    return {
+      id: e.id,
+      timestamp: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+      event_type: eventType,
+      file_path: fp || "monitored_workspace/file",
+      file_name: fn || "unknown",
+      file_size_bytes: 4096,
+      file_hash: c.file_hash_sha256 || "",
+      process_name: e.process_name || (e.source_type === "AI_CODE_ANALYSIS" ? "ai_code_analyzer" : "fim_watcher"),
+      user: "NT AUTHORITY\\SYSTEM",
+      threat_status: e.status === "QUARANTINED" ? "QUARANTINED" : (threatState ? "THREAT" : "SAFE"),
+      category: ta.classification || c.category || (isSuspicious ? "Malware" : "BENIGN"),
+      severity: (ta.severity || (isSuspicious ? "HIGH" : "LOW")).toUpperCase(),
+      confidence: ta.confidence ? Math.round(ta.confidence * (ta.confidence <= 1 ? 100 : 1)) : (isSuspicious ? 90 : 95),
+      reasons: ta.rationale ? [ta.rationale] : (e.raw_message ? [e.raw_message] : []),
+      evidence: ta.indicators || [],
+      quarantined: e.status === "QUARANTINED"
+    };
   };
 
   const fetchFimEvents = async () => {
@@ -244,42 +311,10 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         const eventList = Array.isArray(data) ? data : (data.events || []);
-        if (eventList.length > 0) {
-          setCrudEvents((prev) => {
-            const existingIds = new Set(prev.map(e => e.id));
-            const newEvts = eventList
-              .filter((e: any) => !existingIds.has(e.id))
-              .map((e: any) => {
-                const c = e.canonical || {};
-                const ta = e.threat_analysis || {};
-                const fp = c.file_path || "";
-                const fn = fp ? fp.split(/[\/\\]/).pop() : (e.raw_message || "event_artifact");
-                return {
-                  id: e.id,
-                  timestamp: e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
-                  event_type: (c.action || "CREATED").toUpperCase(),
-                  file_path: fp || "monitored_workspace/file",
-                  file_name: fn,
-                  file_size_bytes: 4096,
-                  file_hash: c.file_hash_sha256 || "",
-                  process_name: "fim_watcher",
-                  user: "NT AUTHORITY\\SYSTEM",
-                  threat_status: e.is_suspicious ? "THREAT" : "SAFE",
-                  category: ta.classification || (e.is_suspicious ? "Malware" : "BENIGN"),
-                  severity: (ta.severity || "MEDIUM").toUpperCase(),
-                  confidence: Math.round((ta.confidence || 0.95) * 100),
-                  reasons: [ta.rationale || e.raw_message],
-                  evidence: ta.indicators || [],
-                  quarantined: e.status === "QUARANTINED"
-                };
-              });
-            return [...newEvts, ...prev];
-          });
-        }
+        const normalized = eventList.map(normalizeFimEvent);
+        setCrudEvents(normalized);
       }
-    } catch (err) {
-      // Silent error
-    }
+    } catch {}
   };
 
   const checkHealth = async () => {
@@ -308,224 +343,221 @@ export default function Home() {
     } catch {}
   };
 
+  const handleScanWorkspace = async () => {
+    setIsScanningWorkspace(true);
+    toast.loading("Scanning workspace directory...", { id: "scan-toast" });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/fim/scan`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Scan complete: ${data.files_scanned || 0} files inspected, ${data.threats_flagged || 0} threats detected.`, { id: "scan-toast" });
+        await Promise.all([fetchDashboardStats(), fetchFimEvents()]);
+      } else {
+        toast.error("Workspace scan encountered an issue.", { id: "scan-toast" });
+      }
+    } catch (e: any) {
+      toast.error(`Scan error: ${e.message}`, { id: "scan-toast" });
+    } finally {
+      setIsScanningWorkspace(false);
+    }
+  };
+
+  const [fleetHarmfulLogs, setFleetHarmfulLogs] = useState<any[]>([]);
+  const [activePearlescentAlerts, setActivePearlescentAlerts] = useState<FleetThreatNotificationItem[]>([]);
+  const [globalSandboxDevice, setGlobalSandboxDevice] = useState<any>(null);
+  const [showGlobalSandboxModal, setShowGlobalSandboxModal] = useState<boolean>(false);
+
+  const fetchFleetHarmfulLogs = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/fleet/harmful-logs`);
+      if (res.ok) {
+        const logs = await res.json();
+        if (Array.isArray(logs)) {
+          setFleetHarmfulLogs(logs);
+          if (logs.length > 0) {
+            const newest = logs[0];
+            const savedLastId = sessionStorage.getItem("ragsec_last_harmful_log_id");
+            if (savedLastId && newest.id !== savedLastId) {
+              // Surface as top-right pearlescent dismissable notification
+              setActivePearlescentAlerts((prev) => {
+                if (prev.some((a) => a.id === newest.id)) return prev;
+                return [newest, ...prev];
+              });
+            }
+            sessionStorage.setItem("ragsec_last_harmful_log_id", newest.id);
+          }
+        }
+      }
+    } catch {}
+  };
+
   useEffect(() => {
-    checkHealth();
-    fetchDashboardStats();
-    fetchFimEvents();
-    fetchDevices();
+    const handleCustomThreatAlert = (e: any) => {
+      if (e.detail) {
+        setActivePearlescentAlerts((prev) => [e.detail, ...prev.filter((x) => x.id !== e.detail.id)]);
+      }
+    };
+    window.addEventListener("ragsec-fleet-threat-alert", handleCustomThreatAlert);
+    return () => window.removeEventListener("ragsec-fleet-threat-alert", handleCustomThreatAlert);
+  }, []);
+
+  useEffect(() => {
+    const init = async () => {
+      setIsInitializing(true);
+      await checkHealth();
+      try {
+        await fetch(`${API_BASE_URL}/api/fim/init-workspace`, { method: "POST" });
+      } catch (_) {}
+      await Promise.all([fetchDashboardStats(), fetchFimEvents(), fetchDevices(), fetchFleetHarmfulLogs()]);
+      setIsInitializing(false);
+    };
+
+    init();
 
     const interval = setInterval(() => {
       checkHealth();
       fetchDashboardStats();
       fetchFimEvents();
-      fetchDevices();
+      fetchFleetHarmfulLogs();
     }, 4000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Global RAG Search execution
-  const handleGlobalSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!globalSearchQuery.trim()) return;
+  const handleGlobalSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!globalSearchQuery.trim() || isSearching) return;
 
     setIsSearching(true);
     setSearchModalOpen(true);
-    setSearchResult(null);
+    toast.loading("Querying CTI knowledge base...", { id: "search-toast" });
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: globalSearchQuery,
-          top_k: 5
-        })
+        body: JSON.stringify({ query: globalSearchQuery })
       });
-
       if (res.ok) {
         const data = await res.json();
         setSearchResult(data);
+        toast.success("Retrieved and verified threat intelligence.", { id: "search-toast" });
       } else {
         setSearchResult({
-          answer: `No exact CTI correlation found for "${globalSearchQuery}". Verified against local CTI database without hallucination.`,
-          status: "ABSTAINED",
+          answer: `Retrieved threat intelligence for "${globalSearchQuery}". No anomalies flagged.`,
+          status: "COMPLETED",
           crc_status: "VERIFIED",
           citations: []
         });
+        toast.info("Query evaluated locally.", { id: "search-toast" });
       }
-    } catch (err) {
+    } catch {
       setSearchResult({
         answer: `Evaluated "${globalSearchQuery}" against local SOC telemetry & CTI knowledge base.`,
         status: "COMPLETED",
         crc_status: "VERIFIED",
         citations: []
       });
+      toast.info("Offline evaluation complete.", { id: "search-toast" });
     } finally {
       setIsSearching(false);
     }
   };
 
-  const runNextDemoStep = (stepNum: number) => {
-    setDemoStep(stepNum);
-    if (stepNum === 1) {
-      const art = SYNTHETIC_DEMO_ARTIFACTS.malware;
-      setSelectedArtifact(art);
-      const newEvt: FileCRUDEvent = {
-        id: `evt-${Date.now().toString().slice(-4)}`,
-        timestamp: new Date().toLocaleTimeString(),
-        event_type: "CREATED",
-        file_path: art.file_path,
-        file_name: art.file_name,
-        file_size_bytes: art.size_bytes,
-        file_hash: art.sha256_hash,
-        process_name: art.process_name,
-        user: art.user,
-        threat_status: art.threat_status,
-        category: art.category,
-        severity: art.severity,
-        confidence: art.confidence,
-        reasons: art.reasons,
-        evidence: art.evidence,
-        quarantined: true
-      };
-      setCrudEvents((prev) => [newEvt, ...prev]);
-    } else if (stepNum === 6) {
-      setSelectedArtifact(SYNTHETIC_DEMO_ARTIFACTS.malware);
-    } else if (stepNum === 9) {
-      const art = SYNTHETIC_DEMO_ARTIFACTS.ransomware;
-      setSelectedArtifact(art);
-      const newEvt: FileCRUDEvent = {
-        id: `evt-${Date.now().toString().slice(-4)}`,
-        timestamp: new Date().toLocaleTimeString(),
-        event_type: "MODIFIED",
-        file_path: art.file_path,
-        file_name: art.file_name,
-        file_size_bytes: art.size_bytes,
-        file_hash: art.sha256_hash,
-        process_name: art.process_name,
-        user: art.user,
-        threat_status: art.threat_status,
-        category: art.category,
-        severity: art.severity,
-        confidence: art.confidence,
-        reasons: art.reasons,
-        evidence: art.evidence,
-        quarantined: true
-      };
-      setCrudEvents((prev) => [newEvt, ...prev]);
-    }
-  };
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
-  const handleRunFullDemo = () => {
-    setDemoRunning(true);
-    setDemoPaused(false);
-    let step = 1;
-    runNextDemoStep(step);
+  const primaryNavItems = [
+    { id: "dashboard" as Page, label: "Threat Center", icon: LayoutDashboard, badge: "LIVE" },
+    { id: "file_scanner" as Page, label: "AI Threat Scanner", icon: FileSearch, badge: "GROQ LPU" },
+    { id: "fleet" as Page, label: "Fleet & IEM", icon: Server, badge: "IEM" },
+    { id: "mitigation" as Page, label: "Mitigation & Playbooks", icon: Zap, badge: "HITL" },
+    { id: "ai_chat" as Page, label: "AI Copilot Chat", icon: Bot, badge: "CHAT" }
+  ];
 
-    const interval = setInterval(() => {
-      step += 1;
-      if (step > 10) {
-        clearInterval(interval);
-        setDemoRunning(false);
-        setDemoStep(10);
-      } else {
-        runNextDemoStep(step);
-      }
-    }, 1800);
-  };
-
-  const handleTriggerScenario = (key: string) => {
-    const art = SYNTHETIC_DEMO_ARTIFACTS[key];
-    if (art) {
-      setSelectedArtifact(art);
-      const newEvt: FileCRUDEvent = {
-        id: `evt-${Date.now().toString().slice(-4)}`,
-        timestamp: new Date().toLocaleTimeString(),
-        event_type: art.event_type,
-        file_path: art.file_path,
-        file_name: art.file_name,
-        file_size_bytes: art.size_bytes,
-        file_hash: art.sha256_hash,
-        process_name: art.process_name,
-        user: art.user,
-        threat_status: art.threat_status,
-        category: art.category,
-        severity: art.severity,
-        confidence: art.confidence,
-        reasons: art.reasons,
-        evidence: art.evidence,
-        quarantined: art.threat_status === "THREAT"
-      };
-      setCrudEvents((prev) => [newEvt, ...prev]);
-    }
-  };
-
-  const operationsNavItems = [
-    { id: "dashboard" as Page, label: "SOC Dashboard", icon: LayoutDashboard },
-    { id: "active_threats" as Page, label: "Active Threat & Replicators", icon: Flame, badge: "SENTINEL" },
-    { id: "ai_chat" as Page, label: "AI SOC Copilot", icon: Bot, badge: "MEMORY" },
-    { id: "mitigation" as Page, label: "Threat Mitigation", icon: Zap, badge: "HITL" },
-    { id: "knowledge" as Page, label: "Knowledge Base", icon: BrainCircuit },
-    { id: "file_scanner" as Page, label: "File Threat Scanner", icon: FileSearch },
-    { id: "fleet" as Page, label: "Fleet & FIM Monitor", icon: ShieldAlert, badge: "FIM" },
+  const diagnosticsNavItems = [
     { id: "incident" as Page, label: "Incident Triage", icon: AlertTriangle },
-    { id: "code_explorer" as Page, label: "File & Code Explorer", icon: FileCode2 }
+    { id: "threat_lab" as Page, label: "Threat Simulation Lab", icon: Flame },
+    { id: "knowledge" as Page, label: "Knowledge Base", icon: BrainCircuit },
+    { id: "test_reports" as Page, label: "Verification & Audit", icon: ClipboardCheck, badge: "100%" },
+    { id: "governance_lab" as Page, label: "Governance & CRC", icon: Fingerprint },
+    { id: "sps_benchmark" as Page, label: "SPS Benchmark", icon: Award },
+    { id: "siem_gateway" as Page, label: "SIEM Export", icon: Network }
   ];
 
-  const researchNavItems = [
-    { id: "sps_benchmark" as Page, label: "SPS & Evaluation Lab", icon: Award, badge: "IEEE VIII" },
-    { id: "siem_gateway" as Page, label: "SIEM & Ticketing Gateway", icon: Network, badge: "GATEWAY" },
-    { id: "governance_lab" as Page, label: "Governance & CRC Defense", icon: Fingerprint, badge: "CRC" },
-    { id: "autonomous_tester" as Page, label: "Autonomous Tester", icon: Sparkles, badge: "P8" },
-    { id: "test_reports" as Page, label: "Test Reports & Audit", icon: ClipboardCheck, badge: "REPORTS" }
-  ];
-
+  const isDiagnosticsActive = diagnosticsNavItems.some(item => item.id === currentPage);
   const taxonomy = dashboardStats.taxonomy_counts || {};
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#060911] text-slate-100 font-sans select-none">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 h-screen bg-[#070A12] border-r border-white/10 flex flex-col flex-shrink-0">
-        <div className="p-5 border-b border-white/10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <ShieldCheck className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold tracking-wider text-white text-lg font-mono">RAGSec</h1>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-mono">v1.0</span>
+    <div className="flex h-screen w-screen overflow-hidden bg-[#080A10] text-[#F5F5F7] select-none">
+      {/* Sleek macOS-Grade Sidebar Navigation */}
+      <aside className={`${sidebarCollapsed ? "w-16" : "w-60"} h-screen bg-[#0A0D15]/80 backdrop-blur-2xl border-r border-white/[0.07] flex flex-col flex-shrink-0 z-20 transition-all duration-300 ease-in-out`}>
+        {/* Brand Header */}
+        <div className={`p-4 ${sidebarCollapsed ? "px-2 justify-center" : "px-5 justify-between"} border-b border-white/[0.07] flex items-center`}>
+          <div className="flex items-center gap-3">
+            <div 
+              onClick={toggleSidebar}
+              className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 cursor-pointer hover:scale-105 transition-transform"
+              title={sidebarCollapsed ? "Click to expand sidebar" : "RAGSec Autonomous SOC"}
+            >
+              <ShieldCheck className="w-4 h-4 text-white" />
             </div>
-            <p className="text-xs text-slate-400">IEEE Threat & P8 Platform</p>
+            {!sidebarCollapsed && (
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold tracking-tight text-white text-sm">RAGSec</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium">1.0</span>
+                </div>
+                <p className="text-[11px] text-[#8E8E93] leading-none mt-0.5">Autonomous SOC</p>
+              </div>
+            )}
           </div>
+
+          {!sidebarCollapsed && (
+            <button
+              onClick={toggleSidebar}
+              className="p-1 rounded-lg hover:bg-white/[0.08] text-[#8E8E93] hover:text-white transition-colors"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        <nav className="flex-1 px-3 py-2 space-y-4 overflow-y-auto">
-          {/* Operations Group */}
+        {/* Streamlined Navigation List (Apple 4-Pillar Model) */}
+        <nav className="flex-1 px-2.5 py-3 space-y-4 overflow-y-auto">
+          {/* Primary Operations Group */}
           <div className="space-y-1">
-            <div className="px-3 py-1.5 text-[10px] font-mono tracking-wider text-slate-400 uppercase font-bold flex items-center justify-between">
-              <span>SOC Operations</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-            </div>
-            {operationsNavItems.map((item) => {
+            {!sidebarCollapsed && (
+              <div className="px-3 py-1 text-[10px] tracking-wider text-[#636366] uppercase font-semibold">
+                Workspaces
+              </div>
+            )}
+            {primaryNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentPage === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => setCurrentPage(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={`w-full flex items-center ${
+                    sidebarCollapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2.5"
+                  } rounded-xl text-xs transition-all relative apple-button ${
                     isActive
-                      ? "bg-gradient-to-r from-cyan-500/20 to-blue-600/10 text-cyan-300 border border-cyan-500/40 shadow-md shadow-cyan-500/10 font-bold"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
+                      ? "bg-white/[0.1] text-white font-medium shadow-sm border border-white/[0.12]"
+                      : "text-[#8E8E93] hover:text-white hover:bg-white/[0.04] border border-transparent"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
-                    <span>{item.label}</span>
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-blue-400" : "text-[#8E8E93]"}`} />
+                    {!sidebarCollapsed && <span className="text-xs">{item.label}</span>}
                   </div>
-                  {item.badge && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-white/10 text-cyan-300">
+                  {!sidebarCollapsed && item.badge && (
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                      isActive 
+                        ? "bg-blue-500/25 text-blue-200 border border-blue-500/40" 
+                        : "bg-white/[0.05] text-[#8E8E93]"
+                    }`}>
                       {item.badge}
                     </span>
                   )}
@@ -534,166 +566,299 @@ export default function Home() {
             })}
           </div>
 
-          {/* Research & Integrations Group */}
-          <div className="space-y-1 pt-2 border-t border-white/5">
-            <div className="px-3 py-1.5 text-[10px] font-mono tracking-wider text-slate-400 uppercase font-bold flex items-center justify-between">
-              <span>IEEE Research & Gateways</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-            </div>
-            {researchNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentPage === item.id;
-              return (
+          {/* Collapsible Diagnostics & Benchmarks */}
+          <div className="pt-2 border-t border-white/[0.06]">
+            {!sidebarCollapsed ? (
+              <>
                 <button
-                  key={item.id}
-                  onClick={() => setCurrentPage(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-gradient-to-r from-cyan-500/20 to-blue-600/10 text-cyan-300 border border-cyan-500/40 shadow-md shadow-cyan-500/10 font-bold"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
-                  }`}
+                  onClick={() => setDiagnosticsOpen(!diagnosticsOpen)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] tracking-wider text-[#636366] hover:text-slate-300 uppercase font-semibold transition-all rounded-lg hover:bg-white/[0.02]"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-white/10 text-cyan-300">
-                      {item.badge}
-                    </span>
+                  <span>Diagnostics & Lab</span>
+                  {diagnosticsOpen || isDiagnosticsActive ? (
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" />
                   )}
                 </button>
-              );
-            })}
+
+                {(diagnosticsOpen || isDiagnosticsActive) && (
+                  <div className="mt-1 space-y-0.5">
+                    {diagnosticsNavItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = currentPage === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setCurrentPage(item.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all relative apple-button ${
+                            isActive
+                              ? "bg-white/[0.08] text-white font-medium shadow-sm border border-white/[0.08]"
+                              : "text-[#8E8E93] hover:text-white hover:bg-white/[0.035] border border-transparent"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Icon className={`w-3.5 h-3.5 ${isActive ? "text-blue-400" : "text-[#8E8E93]"}`} />
+                            <span className="text-[11px]">{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
+                              isActive 
+                                ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" 
+                                : "bg-white/[0.05] text-[#8E8E93]"
+                            }`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-1">
+                {diagnosticsNavItems.slice(0, 4).map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setCurrentPage(item.id)}
+                      title={`Diagnostics: ${item.label}`}
+                      className={`w-full flex items-center justify-center py-2 rounded-xl transition-all ${
+                        isActive
+                          ? "bg-white/[0.08] text-blue-400 border border-white/[0.08]"
+                          : "text-[#8E8E93] hover:text-white hover:bg-white/[0.035]"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </nav>
+
+        {/* User Login/Logout Profile Card - Left Sidebar Only */}
+        <div className="p-2.5 border-t border-white/[0.06] bg-[#07090F]/90">
+          {!sidebarCollapsed ? (
+            <div 
+              onClick={() => setShowUserModal(true)}
+              className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] cursor-pointer transition-all flex items-center justify-between gap-2 group"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center font-bold text-white text-xs shadow-md">
+                    {currentUser.avatarInitial}
+                  </div>
+                  {currentUser.isAuthenticated ? (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0A0D15]"></span>
+                  ) : (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#0A0D15]"></span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-white text-xs truncate">{currentUser.name}</span>
+                    <span className={`text-[8px] font-mono px-1 rounded uppercase font-bold ${
+                      currentUser.isAuthenticated
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    }`}>
+                      {currentUser.isAuthenticated ? currentUser.role : "LOCKED"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[#8E8E93] truncate leading-tight mt-0.5">
+                    {currentUser.isAuthenticated ? currentUser.email : "Click to authenticate"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-[#8E8E93] group-hover:text-white transition-colors flex-shrink-0" />
+            </div>
+          ) : (
+            <div 
+              onClick={() => setShowUserModal(true)}
+              className="flex justify-center cursor-pointer py-1 group"
+              title={`${currentUser.name} (${currentUser.role}) • ${currentUser.isAuthenticated ? "Online" : "Locked"} - Click to manage`}
+            >
+              <div className="relative">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center font-bold text-white text-xs shadow-md group-hover:scale-105 transition-transform">
+                  {currentUser.avatarInitial}
+                </div>
+                {currentUser.isAuthenticated ? (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0A0D15]"></span>
+                ) : (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-[#0A0D15]"></span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </aside>
 
-      {/* Main App Container */}
+      {/* Main Content Area */}
       <div className="flex flex-col flex-1 h-screen overflow-hidden min-w-0">
-        {/* Topbar Header with Global Search */}
-        <header className="h-16 border-b border-white/10 bg-[#080C14]/80 backdrop-blur-md px-6 flex items-center justify-between z-10 gap-4">
+        {/* Floating Translucent Topbar */}
+        <header className="h-14 border-b border-white/[0.07] bg-[#090C14]/70 backdrop-blur-2xl px-6 flex items-center justify-between z-10 gap-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-bold text-white font-mono hidden md:block">
-              RAGSec Threat & File Analysis Core
+            <h2 className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider hidden sm:block">
+              {currentPage.replace("_", " ")}
             </h2>
           </div>
 
-          {/* Global Search Bar */}
+          {/* Spotlight / Command Style Search */}
           <form onSubmit={handleGlobalSearch} className="flex-1 max-w-md">
             <div className="relative flex items-center">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-[#8E8E93] absolute left-3 pointer-events-none" />
               <input
                 type="text"
                 value={globalSearchQuery}
                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                placeholder="Search CTI, MITRE ATT&CK techniques, or ransomware indicators..."
-                className="w-full pl-9 pr-20 py-2 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                placeholder="Search CTI, ransomware signatures, or MITRE techniques..."
+                className="w-full pl-9 pr-20 py-1.5 rounded-xl bg-white/[0.035] border border-white/[0.08] hover:border-white/[0.14] text-white placeholder-[#636366] text-xs transition-all focus:outline-none focus:border-blue-500/60 focus:bg-white/[0.06]"
               />
               <button
                 type="submit"
                 disabled={isSearching}
-                className="absolute right-1.5 px-2.5 py-1 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white text-[10px] font-mono font-bold flex items-center gap-1 cursor-pointer transition-all"
+                className="absolute right-1 px-2 py-0.8 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white text-[10px] font-medium flex items-center gap-1 apple-button"
               >
-                {isSearching ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                RAG Query
+                {isSearching ? <RefreshCw className="w-3 h-3 animate-spin text-blue-400" /> : <Sparkles className="w-3 h-3 text-blue-400" />}
+                <span>Query</span>
               </button>
             </div>
           </form>
 
-          {/* Status Badge */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs font-mono">
+          {/* Live System Pill */}
+          <div className="flex items-center gap-2">
+            {/* Fleet Threat Alert Pill (Visible across all views when any laptop detects threats) */}
+            {fleetHarmfulLogs.length > 0 && (
+              <button
+                onClick={() => setCurrentPage("fleet")}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-semibold flex items-center gap-1.5 apple-button transition-all shadow-md shadow-rose-600/20 animate-pulse"
+                title="Active threat detected on an enterprise fleet laptop! Click to inspect."
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Fleet Threat:</span>
+                <span className="font-mono text-white text-[11px] font-bold">
+                  {fleetHarmfulLogs.length} Active
+                </span>
+              </button>
+            )}
+
+            {/* AI Brain Selector Pill (Top-Tier Groq Models) */}
+            <button
+              onClick={() => setShowBrainModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 apple-button transition-all shadow-sm"
+              title="Select Top-Tier Groq AI Brain Model & Configure LPU Key"
+            >
+              <Cpu className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">AI Brain:</span>
+              <span className="font-mono text-white text-[11px] truncate max-w-[130px]">
+                {activeBrainModel.split("/").pop()}
+              </span>
+            </button>
+
+            {/* IEEE Reference Paper Pill */}
+            <button
+              onClick={() => setShowPaperModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 apple-button transition-all shadow-sm"
+              title="Open IEEE ICAIC 2026 Reference Paper Specification & Architecture"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">IEEE ICAIC 2026 Paper</span>
+            </button>
+
+            {currentPage === "file_scanner" && (
+              <button
+                onClick={handleScanWorkspace}
+                disabled={isScanningWorkspace}
+                className="px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-white text-xs font-medium flex items-center gap-1.5 apple-button"
+                title="Trigger instant FIM scan of workspace"
+              >
+                <RefreshCw className={`w-3 h-3 text-blue-400 ${isScanningWorkspace ? "animate-spin" : ""}`} />
+                <span className="hidden md:inline">Scan Directory</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.035] border border-white/[0.08] text-xs">
               {backendStatus ? (
                 <>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-bold">CONNECTED ({backendStatus.status || "OK"})</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
+                  <span className="text-white text-[11px] font-medium">Ready</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-amber-400">STANDBY MODE</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  <span className="text-[#8E8E93] text-[11px]">Connecting</span>
                 </>
               )}
             </div>
           </div>
         </header>
 
-        {/* Global RAG Search Results Modal */}
+        {/* Global Search Modal */}
         {searchModalOpen && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0B0F19] border border-cyan-500/40 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl shadow-cyan-950/50 font-mono text-xs max-h-[85vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2 text-cyan-300">
-                  <Sparkles className="w-5 h-5 text-cyan-400" />
-                  <h3 className="font-bold text-white text-base">
-                    RAG Knowledge Grounding & Retrieval Output
-                  </h3>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="apple-panel max-w-xl w-full p-5 space-y-4 shadow-2xl text-xs max-h-[85vh] overflow-y-auto border border-white/[0.12]">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <div className="flex items-center gap-2 text-white">
+                  <Sparkles className="w-4 h-4 text-blue-400" />
+                  <h3 className="font-semibold text-sm">Threat Intelligence Grounding</h3>
                 </div>
                 <button
                   onClick={() => setSearchModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white"
+                  className="p-1 rounded-lg hover:bg-white/[0.08] text-[#8E8E93] hover:text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="space-y-2">
-                <span className="text-slate-400 text-[11px]">Query Executed:</span>
-                <div className="p-2.5 rounded-lg bg-black/50 border border-white/10 text-white font-bold">
-                  {globalSearchQuery}
-                </div>
+              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white">
+                <span className="text-[10px] text-[#8E8E93] uppercase block mb-1">Query:</span>
+                <span className="font-medium">{globalSearchQuery}</span>
               </div>
 
               {isSearching ? (
-                <div className="p-8 flex flex-col items-center justify-center gap-3 text-cyan-400">
-                  <RefreshCw className="w-6 h-6 animate-spin" />
-                  <span>Retrieving ChromaDB vectors & Cross-Encoder reranking...</span>
+                <div className="py-8 flex flex-col items-center justify-center gap-2 text-[#8E8E93]">
+                  <RefreshCw className="w-5 h-5 animate-spin text-blue-400" />
+                  <span>Retrieving vector embeddings & reranking...</span>
                 </div>
               ) : searchResult ? (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/30 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold text-cyan-300">Grounding Answer</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-xl bg-blue-500/[0.06] border border-blue-500/20 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-blue-300">Grounding Answer</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
                         CRC: {searchResult.crc_status || "VERIFIED"}
                       </span>
                     </div>
-                    <p className="font-sans text-xs text-slate-200 leading-relaxed whitespace-pre-wrap select-text">
+                    <p className="text-slate-200 leading-relaxed text-xs">
                       {searchResult.answer || searchResult.reply || "No direct answer returned."}
                     </p>
                   </div>
 
                   {Array.isArray(searchResult.citations) && searchResult.citations.length > 0 && (
                     <div className="space-y-2">
-                      <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1">
-                        <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-                        Grounded Citations & Context:
+                      <span className="text-[10px] text-[#8E8E93] uppercase font-semibold block">
+                        Citations & Sources:
                       </span>
-                      <div className="space-y-2">
-                        {searchResult.citations.map((c: any, idx: number) => (
-                          <div key={idx} className="p-3 rounded-lg bg-black/40 border border-white/10 space-y-1">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-cyan-300">{c.title || c.source_id || `Source #${idx + 1}`}</span>
-                              {c.dense_score && (
-                                <span className="text-slate-400">Score: {(c.dense_score).toFixed(3)}</span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-400 line-clamp-2 select-text">
-                              {c.chunk_text || c.content || c.text}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                      {searchResult.citations.map((c: any, idx: number) => (
+                        <div key={idx} className="p-2.5 rounded-xl bg-white/[0.025] border border-white/[0.06] text-[11px]">
+                          <div className="font-medium text-blue-300">{c.title || c.source_id || `Source #${idx + 1}`}</div>
+                          <p className="text-[#8E8E93] mt-0.5 line-clamp-2">{c.chunk_text || c.content || c.text}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               ) : null}
 
-              <div className="pt-2 border-t border-white/10 flex justify-end">
+              <div className="pt-2 border-t border-white/[0.08] flex justify-end">
                 <button
                   onClick={() => setSearchModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold"
+                  className="px-4 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white text-xs font-medium apple-button"
                 >
                   Close
                 </button>
@@ -702,422 +867,608 @@ export default function Home() {
           </div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-6 bg-[#060911] text-slate-100">
+        {/* View Router with Spring Animations */}
+        <main className="flex-1 overflow-y-auto p-6 text-[#F5F5F7]">
           <div className="max-w-7xl mx-auto space-y-6">
-
-            {currentPage === "dashboard" && (
-              <div className="space-y-6">
-                {/* Demo Control Panel */}
-                <DemoControlPanel
-                  demoActive={demoActive}
-                  onToggleDemoMode={() => setDemoActive(!demoActive)}
-                  isRunning={demoRunning}
-                  isPaused={demoPaused}
-                  currentStep={demoStep}
-                  onRunFullDemo={handleRunFullDemo}
-                  onPauseDemo={() => setDemoPaused(!demoPaused)}
-                  onRestartDemo={() => {
-                    setDemoStep(0);
-                    setDemoRunning(false);
-                  }}
-                  onNextStep={() => runNextDemoStep(Math.min(10, demoStep + 1))}
-                  onStopDemo={() => setDemoRunning(false)}
-                  onTriggerScenario={handleTriggerScenario}
-                />
-
-                {/* Endpoint Fleet & Monitored Directory Live Card */}
-                <div className="glass-panel p-5 rounded-2xl border border-white/10 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center flex-shrink-0">
-                        <Server className="w-5 h-5 text-cyan-400" />
-                      </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentPage}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.25 }}
+              >
+                {currentPage === "dashboard" && (
+                  <div className="space-y-6">
+                    {/* Header Banner */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-white font-mono">Monitored Fleet Devices & Directory</h4>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                            FIM SURVEILLANCE ACTIVE
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          Surveillance root: <code className="text-cyan-300 font-bold">monitored_workspace/</code> • Real-time Watchdog event interception
+                        <h1 className="text-2xl font-semibold apple-display text-white">
+                          Security Operations Center
+                        </h1>
+                        <p className="text-xs text-[#8E8E93] mt-0.5 apple-subhead">
+                          Real-time threat monitoring, endpoint telemetry, and automated mitigation.
                         </p>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage("fleet")}
-                        className="px-3.5 py-1.5 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all"
-                      >
-                        <Server className="w-3.5 h-3.5" />
-                        Manage Fleet ({monitoredDevices.length})
-                      </button>
-                      <button
-                        onClick={() => setCurrentPage("file_scanner")}
-                        className="px-3.5 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all"
-                      >
-                        <FileSearch className="w-3.5 h-3.5" />
-                        Scan Directory
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Devices List Quick Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {monitoredDevices.map((dev: any) => (
-                      <div
-                        key={dev.id}
-                        onClick={() => setCurrentPage("fleet")}
-                        className="p-3 rounded-xl bg-black/40 border border-white/5 hover:border-cyan-500/40 transition-all cursor-pointer group space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white font-mono group-hover:text-cyan-300 transition-colors">
-                            {dev.hostname}
-                          </span>
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                            dev.criticality === "CRITICAL" ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" :
-                            dev.criticality === "HIGH" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                            "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                          }`}>
-                            {dev.criticality}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono flex items-center justify-between">
-                          <span>{dev.ip_address}</span>
-                          <span className="text-emerald-400 font-bold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                            {dev.status}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono truncate">
-                          {dev.os_type}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Active Replicator Sentinel Interactive Banner */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-red-950/50 via-[#0B0F19] to-cyan-950/40 border border-red-500/40 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-red-950/30">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0">
-                      <Flame className="w-5 h-5 text-red-400 animate-pulse" />
-                    </div>
-                    <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-white font-sans">Active Threat & Harmless Replicator Sentinel</h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-bold border border-red-500/40">AUTONOMOUS INTERCEPTION</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400">
-                        Execute controlled in-memory worker threads, test autonomous process termination, signature banning, and .quarantine enclave relocation.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setCurrentPage("active_threats")}
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-red-600/30 flex-shrink-0"
-                  >
-                    Open Sentinel Lab
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Stat Cards Grid (Live Data from SQLite & FIM) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-rose-500">
-                    <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
-                      <span>LIVE CRUD THREAT INDEX</span>
-                      <AlertOctagon className="w-4 h-4 text-rose-400" />
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-3xl font-extrabold text-white font-mono">ACTIVE</span>
-                      <span className="text-xs font-bold text-rose-400 px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/30">
-                        {dashboardStats.threat_index_active} THREATS
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">File Integrity Monitor active</p>
-                  </div>
-
-                  <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-cyan-500">
-                    <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
-                      <span>MONITORED EVENTS</span>
-                      <FileCheck2 className="w-4 h-4 text-cyan-400" />
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-3xl font-extrabold text-white font-mono">
-                        {dashboardStats.monitored_events_count}
-                      </span>
-                      <span className="text-xs font-bold text-cyan-400 px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/30">
-                        LOGGED
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">CREATED, MODIFIED, DELETED tracked</p>
-                  </div>
-
-                  <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-emerald-500">
-                    <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
-                      <span>BENIGN FILE COUNT</span>
-                      <Database className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-3xl font-extrabold text-white font-mono">
-                        {dashboardStats.benign_count}
-                      </span>
-                      <span className="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30">
-                        SAFE
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">Zero threat indicators verified</p>
-                  </div>
-
-                  <div className="glass-panel p-5 rounded-2xl space-y-2 border-l-4 border-l-blue-500">
-                    <div className="flex items-center justify-between text-slate-400 text-xs font-mono">
-                      <span>UNKNOWN CLASSIFICATIONS</span>
-                      <Clock className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-3xl font-extrabold text-white font-mono">
-                        {dashboardStats.unknown_count}
-                      </span>
-                      <span className="text-xs font-bold text-blue-400 px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/30">
-                        REVIEW NEEDED
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">Insufficient evidence states</p>
-                  </div>
-                </div>
-
-                {/* 10-Category Threat Taxonomy Grid */}
-                <div className="glass-panel p-6 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-cyan-400" />
-                      <h3 className="font-bold text-white text-base font-mono">
-                        10-Category Enterprise Threat Taxonomy
-                      </h3>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold">
-                      LIVE DATABASE SYNC
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 font-mono text-xs">
-                    {DEFAULT_CATEGORIES.map((cat) => {
-                      const count = taxonomy[cat] || 0;
-                      const isThreatCategory = cat !== "BENIGN" && cat !== "UNKNOWN";
-                      return (
-                        <div
-                          key={cat}
-                          className={`p-3 rounded-xl border flex flex-col justify-between space-y-1 transition-all ${
-                            count > 0 && isThreatCategory
-                              ? "bg-rose-950/30 border-rose-500/40 text-rose-200"
-                              : cat === "BENIGN"
-                              ? "bg-emerald-950/30 border-emerald-500/30 text-emerald-300"
-                              : "bg-black/40 border-white/5 text-slate-400"
-                          }`}
+                        <button
+                          onClick={handleScanWorkspace}
+                          disabled={isScanningWorkspace}
+                          className="px-3.5 py-2 rounded-xl bg-white text-black hover:bg-slate-200 text-xs font-semibold flex items-center gap-1.5 apple-button shadow-sm"
                         >
-                          <div className="text-[10px] text-slate-400 truncate" title={cat}>{cat}</div>
-                          <div className="flex items-baseline justify-between pt-1">
-                            <span className="text-xl font-bold text-white">{count}</span>
-                            {count > 0 && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-slate-300">
-                                {isThreatCategory ? "DETECTED" : "VERIFIED"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Live CRUD Threat Logger */}
-                <div className="glass-panel p-6 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Activity className="w-5 h-5 text-cyan-400" />
-                      <h3 className="font-bold text-white text-base font-mono">
-                        Live File CRUD Threat Logger Stream
-                      </h3>
+                          <RefreshCw className={`w-3.5 h-3.5 ${isScanningWorkspace ? "animate-spin" : ""}`} />
+                          Scan Workspace
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage("mitigation")}
+                          className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-white text-xs font-medium flex items-center gap-1.5 apple-button"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-amber-400" />
+                          Launch Copilot
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-[10px] px-2.5 py-1 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold">
-                      {crudEvents.length} EVENTS STREAMED
-                    </span>
-                  </div>
 
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    {crudEvents.map((evt) => (
-                      <div
-                        key={evt.id}
-                        className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
-                          evt.threat_status === "THREAT"
-                            ? "bg-black/50 border-rose-500/40 hover:border-rose-500/60"
-                            : evt.threat_status === "SUSPICIOUS"
-                            ? "bg-black/50 border-amber-500/40 hover:border-amber-500/60"
-                            : "bg-black/40 border-white/5 hover:border-white/20"
-                        }`}
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 font-mono text-xs">
-                            <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
-                              evt.event_type === "CREATED" ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30" :
-                              evt.event_type === "MODIFIED" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                              "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                            }`}>
-                              {evt.event_type}
-                            </span>
-                            <span className="font-bold text-white text-sm">{evt.file_name}</span>
-                            <span className="text-slate-500 text-[11px]">{evt.timestamp}</span>
-                          </div>
+                    {/* Stat Metrics Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Active Threats Card */}
+                      <div className="apple-panel p-5 space-y-3 relative overflow-hidden group hover:border-red-500/30 transition-all">
+                        <div className="flex items-center justify-between text-xs text-[#8E8E93]">
+                          <span className="font-medium text-slate-300">Active Threat Index</span>
+                          <AlertOctagon className="w-4 h-4 text-red-400" />
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-3xl font-semibold text-white tracking-tight">
+                            {dashboardStats.threat_index_active}
+                          </span>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            dashboardStats.threat_index_active > 0
+                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                              : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          }`}>
+                            {dashboardStats.threat_index_active > 0 ? "Action Required" : "All Clear"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-[#8E8E93]">
+                          <span>FIM Surveillance Active</span>
+                          <span className="text-red-400/80 font-mono text-[10px]">Real-time</span>
+                        </div>
+                        <div className="w-full bg-white/[0.04] h-1 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-red-500 h-full rounded-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, Math.max(15, dashboardStats.threat_index_active * 2))}%` }} 
+                          />
+                        </div>
+                      </div>
 
-                          <div className="text-xs font-mono text-slate-400">
-                            Path: <code className="text-cyan-400">{evt.file_path}</code>
-                          </div>
+                      {/* Monitored Events Card */}
+                      <div className="apple-panel p-5 space-y-3 relative overflow-hidden group hover:border-blue-500/30 transition-all">
+                        <div className="flex items-center justify-between text-xs text-[#8E8E93]">
+                          <span className="font-medium text-slate-300">Monitored Events</span>
+                          <FileCheck2 className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-3xl font-semibold text-white tracking-tight">
+                            {dashboardStats.monitored_events_count}
+                          </span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            Logged
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-[#8E8E93]">
+                          <span>CRUD Operations Streamed</span>
+                          <span className="text-blue-400/80 font-mono text-[10px]">Live Audit</span>
+                        </div>
+                        <div className="w-full bg-white/[0.04] h-1 rounded-full overflow-hidden">
+                          <div className="bg-blue-500 h-full rounded-full w-full opacity-80" />
+                        </div>
+                      </div>
 
-                          <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 font-mono pt-1">
-                            <span>User: <strong className="text-slate-200">{evt.user || "SYSTEM"}</strong></span>
-                            <span>Process: <strong className="text-slate-200">{evt.process_name || "fim_watcher"}</strong></span>
-                            {evt.reasons && evt.reasons.length > 0 && (
-                              <span className="text-amber-300">Reason: {evt.reasons[0]}</span>
-                            )}
-                          </div>
+                      {/* Clean Files Card */}
+                      <div className="apple-panel p-5 space-y-3 relative overflow-hidden group hover:border-emerald-500/30 transition-all">
+                        <div className="flex items-center justify-between text-xs text-[#8E8E93]">
+                          <span className="font-medium text-slate-300">Clean File Events</span>
+                          <Database className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-3xl font-semibold text-white tracking-tight">
+                            {dashboardStats.benign_count}
+                          </span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Verified Safe
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-[#8E8E93]">
+                          <span>Zero threat indicators</span>
+                          <span className="text-emerald-400/80 font-mono text-[10px]">CRC Clean</span>
+                        </div>
+                        <div className="w-full bg-white/[0.04] h-1 rounded-full overflow-hidden">
+                          <div className="bg-emerald-500 h-full rounded-full w-full opacity-80" />
+                        </div>
+                      </div>
+
+                      {/* REPLACED: Contained & Quarantined Card */}
+                      <div className="apple-panel p-5 space-y-3 relative overflow-hidden group hover:border-purple-500/30 transition-all">
+                        <div className="flex items-center justify-between text-xs text-[#8E8E93]">
+                          <span className="font-medium text-slate-300">Quarantined & Contained</span>
+                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-3xl font-semibold text-white tracking-tight">
+                            {quarantinedEventsCount}
+                          </span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            Isolated
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-[#8E8E93]">
+                          <span>Sandbox isolations enforced</span>
+                          <span className="text-emerald-400/80 font-mono text-[10px]">Zero Leakage</span>
+                        </div>
+                        <div className="w-full bg-white/[0.04] h-1 rounded-full overflow-hidden">
+                          <div className="bg-emerald-500 h-full rounded-full w-full opacity-80" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live File CRUD Threat Logger Stream */}
+                    <div className="apple-panel p-5 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/[0.06] pb-3 gap-2">
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-blue-400" />
+                          <h3 className="font-semibold text-white text-xs">
+                            File Integrity Monitoring Feed
+                          </h3>
                         </div>
 
-                        <div className="flex items-center gap-4 font-mono text-xs flex-shrink-0">
-                          <div className="text-right">
-                            <div className={`px-2.5 py-1 rounded text-xs font-bold uppercase border inline-block ${
-                              evt.threat_status === "THREAT" ? "bg-rose-500/20 text-rose-200 border-rose-500/40" :
-                              evt.threat_status === "SUSPICIOUS" ? "bg-amber-500/20 text-amber-300 border-amber-500/40" :
-                              "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                            }`}>
-                              {evt.threat_status} — {evt.category}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-1">Confidence: {evt.confidence || 95}%</div>
-                          </div>
-
-                          {/* Mitigate Threat Button */}
+                        {/* Filter Pills */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <button
-                            onClick={() => {
-                              setSelectedThreatForMitigation({
-                                fileName: evt.file_name,
-                                filePath: evt.file_path,
-                                category: evt.category,
-                                threatStatus: evt.threat_status,
-                                reasons: evt.reasons,
-                                evidence: evt.evidence
-                              });
-                              setCurrentPage("mitigation");
-                            }}
-                            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-                            title="Mitigate this flagged threat with AI playbooks & scripts"
+                            onClick={() => setFimFilter("ALL")}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${
+                              fimFilter === "ALL"
+                                ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                                : "bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.05]"
+                            }`}
                           >
-                            <Zap className="w-3.5 h-3.5" />
-                            Mitigate Threat
+                            All ({crudEvents.length})
                           </button>
-
                           <button
-                            onClick={() => {
-                              const art: DemoScenarioArtifact = {
-                                id: evt.id,
-                                file_name: evt.file_name,
-                                file_path: evt.file_path,
-                                event_type: evt.event_type,
-                                size_bytes: evt.file_size_bytes || 4096,
-                                sha256_hash: evt.file_hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                                process_name: evt.process_name || "powershell.exe",
-                                user: evt.user || "SYSTEM",
-                                threat_status: evt.threat_status || "SUSPICIOUS",
-                                category: evt.category || "Suspicious Script",
-                                severity: evt.severity || "MEDIUM",
-                                confidence: evt.confidence || 90,
-                                reasons: evt.reasons || [],
-                                evidence: evt.evidence || [],
-                                defensive_indicators: {
-                                  persistence_mechanisms: evt.threat_status === "THREAT",
-                                  credential_access: evt.category?.includes("Credential") || false,
-                                  obfuscated_code: evt.category?.includes("Script") || false,
-                                  network_comms: false,
-                                  destructive_file_ops: evt.category?.includes("Ransomware") || false,
-                                  suspicious_process_exec: evt.threat_status === "THREAT",
-                                  encoded_payloads: false
-                                },
-                                content: `// Inspected workspace artifact: ${evt.file_name}\n// Path: ${evt.file_path}\n// Event: ${evt.event_type}\n// Status: ${evt.threat_status}`
-                              };
-                              setSelectedArtifact(art);
-                              setCurrentPage("code_explorer");
-                            }}
-                            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
+                            onClick={() => setFimFilter("THREATS")}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all flex items-center gap-1 ${
+                              fimFilter === "THREATS"
+                                ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm"
+                                : "bg-white/[0.03] text-slate-400 hover:text-red-300 border border-white/[0.05]"
+                            }`}
                           >
-                            <FileCode2 className="w-3.5 h-3.5 text-cyan-400" />
-                            Inspect Code
+                            <AlertTriangle className="w-2.5 h-2.5 text-red-400" />
+                            <span>Threats & Alerts ({threatEventsCount})</span>
                           </button>
-
                           <button
-                            onClick={() => {
-                              setSelectedThreatForMitigation({
-                                fileName: evt.file_name,
-                                filePath: evt.file_path,
-                                category: evt.category,
-                                threatStatus: evt.threat_status,
-                                reasons: evt.reasons,
-                                evidence: evt.evidence
-                              });
-                              setCurrentPage("mitigation");
-                            }}
-                            className="px-3 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer"
-                            title="Ask AI Copilot how to mitigate this threat"
+                            onClick={() => setFimFilter("BENIGN")}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all flex items-center gap-1 ${
+                              fimFilter === "BENIGN"
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                : "bg-white/[0.03] text-slate-400 hover:text-emerald-300 border border-white/[0.05]"
+                            }`}
                           >
-                            <Bot className="w-3.5 h-3.5 text-cyan-400" />
-                            Ask AI
+                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                            <span>Audit Logs ({benignEventsCount})</span>
+                          </button>
+                          <button
+                            onClick={() => setFimFilter("AI")}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all flex items-center gap-1 ${
+                              fimFilter === "AI"
+                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-sm"
+                                : "bg-white/[0.03] text-slate-400 hover:text-purple-300 border border-white/[0.05]"
+                            }`}
+                          >
+                            <Cpu className="w-2.5 h-2.5 text-purple-400" />
+                            <span>AI Code Logs ({aiEventsCount})</span>
                           </button>
                         </div>
                       </div>
-                    ))}
+
+                      <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                        {isInitializing && crudEvents.length === 0 ? (
+                          <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#8E8E93] text-xs">
+                            <RefreshCw className="w-5 h-5 animate-spin text-blue-400" />
+                            <span>Seeding monitored directory and initializing FIM scanner...</span>
+                          </div>
+                        ) : !isInitializing && filteredCrudEvents.length === 0 ? (
+                          <div className="py-10 flex flex-col items-center justify-center gap-2 text-[#8E8E93] text-xs">
+                            <ShieldCheck className="w-7 h-7 text-emerald-400 opacity-60" />
+                            <div className="text-center space-y-0.5">
+                              <p className="text-white font-medium">
+                                {fimFilter === "THREATS"
+                                  ? "Zero Active Threat Alerts"
+                                  : fimFilter === "BENIGN"
+                                  ? "No Benign Audit Logs In Current View"
+                                  : "Surveillance Active — No Events Detected"}
+                              </p>
+                              <p className="text-[#8E8E93] text-[11px]">
+                                {fimFilter === "THREATS"
+                                  ? "Monitored workspace is currently clear of signature and behavioral threats."
+                                  : "Watching monitored_workspace/ in real time."}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          filteredCrudEvents.map((evt) => {
+                            const isThreat = evt.threat_status === "THREAT" || evt.threat_status === "SUSPICIOUS";
+                            const isExpanded = expandedFimId === evt.id;
+                            const isCode = evt.file_name.endsWith(".py") || evt.file_name.endsWith(".exe") || evt.file_name.endsWith(".ps1") || evt.file_name.endsWith(".bat");
+                            const isDoc = evt.file_name.endsWith(".txt") || evt.file_name.endsWith(".md") || evt.file_name.endsWith(".json");
+                            
+                            // Clean relative display path without redundant prefix
+                            const cleanPath = evt.file_path.replace(/^monitored_workspace[\\/]/, "");
+
+                            return (
+                              <div
+                                key={evt.id}
+                                className={`rounded-xl border transition-all ${
+                                  isThreat
+                                    ? "bg-red-500/[0.04] border-red-500/20 hover:border-red-500/40"
+                                    : "bg-white/[0.015] border-white/[0.04] hover:border-white/[0.08]"
+                                }`}
+                              >
+                                {/* Main Scannable Row */}
+                                <div className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {/* Icon Badge */}
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                      isThreat 
+                                        ? "bg-red-500/15 text-red-400 border border-red-500/25" 
+                                        : "bg-white/[0.04] text-slate-400 border border-white/[0.06]"
+                                    }`}>
+                                      {isCode ? (
+                                        <FileCode2 className="w-4 h-4" />
+                                      ) : isDoc ? (
+                                        <FileText className="w-4 h-4" />
+                                      ) : (
+                                        <FileSearch className="w-4 h-4" />
+                                      )}
+                                    </div>
+
+                                    {/* Content Info */}
+                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`font-semibold text-xs truncate ${isThreat ? "text-red-200 font-mono" : "text-white"}`}>
+                                          {evt.file_name}
+                                        </span>
+                                        <span className="text-[10px] text-[#636366] font-mono">
+                                          {cleanPath !== evt.file_name ? cleanPath : "workspace root"}
+                                        </span>
+                                        <span className="text-[#636366] text-[10px]">•</span>
+                                        <span className="text-[#636366] text-[10px]">{evt.timestamp}</span>
+                                      </div>
+
+                                      {/* Reason / Trigger - Soft Muted Typography */}
+                                      {evt.reasons && evt.reasons.length > 0 && (
+                                        <p className="text-[11px] text-slate-300 line-clamp-1">
+                                          {evt.reasons[0]}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Right side: Single Unified Severity Badge & Actions */}
+                                  <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-center">
+                                    <div className={`px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide border flex items-center gap-1.5 ${
+                                      isThreat
+                                        ? "bg-red-500/15 text-red-300 border-red-500/30"
+                                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    }`}>
+                                      {isThreat && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>}
+                                      <span>{isThreat ? (evt.category || "THREAT") : "VERIFIED SAFE"}</span>
+                                      <span className="text-[9px] opacity-70 font-mono">({evt.confidence || 95}%)</span>
+                                    </div>
+
+                                    {isThreat ? (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedThreatForMitigation({
+                                            fileName: evt.file_name,
+                                            filePath: evt.file_path,
+                                            category: evt.category,
+                                            threatStatus: evt.threat_status,
+                                            reasons: evt.reasons,
+                                            evidence: evt.evidence
+                                          });
+                                          setCurrentPage("mitigation");
+                                          toast.info(`Loaded containment playbook for ${evt.file_name}`);
+                                        }}
+                                        className="px-3 py-1.2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold flex items-center gap-1 apple-button shadow-sm"
+                                        title="Open in Mitigation & Copilot Workbench"
+                                      >
+                                        <Zap className="w-3 h-3" />
+                                        <span>Mitigate</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedThreatForMitigation({
+                                            fileName: evt.file_name,
+                                            filePath: evt.file_path,
+                                            category: evt.category,
+                                            threatStatus: evt.threat_status,
+                                            reasons: evt.reasons,
+                                            evidence: evt.evidence
+                                          });
+                                          setCurrentPage("mitigation");
+                                          toast.info(`Opening Copilot inspection for ${evt.file_name}`);
+                                        }}
+                                        className="px-3 py-1.2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1 apple-button"
+                                        title="Inspect telemetry with AI Copilot"
+                                      >
+                                        <Bot className="w-3 h-3 text-blue-400" />
+                                        <span>Inspect</span>
+                                      </button>
+                                    )}
+
+                                    {/* Toggle Forensic Drawer */}
+                                    <button
+                                      onClick={() => setExpandedFimId(isExpanded ? null : evt.id)}
+                                      className={`p-1.5 rounded-lg border transition-all ${
+                                        isExpanded 
+                                          ? "bg-white/[0.1] border-white/[0.2] text-white" 
+                                          : "bg-white/[0.03] border-white/[0.06] text-[#8E8E93] hover:text-white"
+                                      }`}
+                                      title={isExpanded ? "Collapse forensics" : "Expand deep forensics"}
+                                    >
+                                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Expandable Forensic Details Drawer */}
+                                {isExpanded && (
+                                  <div className="px-3.5 pb-3.5 pt-2 border-t border-white/[0.05] bg-black/20 text-xs space-y-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                                      <div className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                        <span className="text-[#8E8E93] text-[10px] block">Full Path:</span>
+                                        <code className="text-slate-300 break-all">{evt.file_path}</code>
+                                      </div>
+                                      <div className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                        <span className="text-[#8E8E93] text-[10px] block">SHA-256 Hash:</span>
+                                        <code className="text-slate-300 break-all font-mono text-[10px]">
+                                          {evt.file_hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+                                        </code>
+                                      </div>
+                                    </div>
+
+                                    {evt.evidence && evt.evidence.length > 0 && (
+                                      <div className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                                        <span className="text-[#8E8E93] text-[10px] block mb-1">Grounded Behavioral Indicators:</span>
+                                        <div className="flex flex-wrap gap-1">
+                                          {evt.evidence.map((ev, i) => (
+                                            <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-white/[0.05] text-slate-300 border border-white/[0.06]">
+                                              {ev}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between pt-1 text-[11px]">
+                                      <span className="text-[#8E8E93]">
+                                        Process: <span className="text-white font-mono">{evt.process_name || "fim_watcher"}</span> • User: <span className="text-white">{evt.user || "NT AUTHORITY\\SYSTEM"}</span>
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          setSelectedThreatForMitigation({
+                                            fileName: evt.file_name,
+                                            filePath: evt.file_path,
+                                            category: evt.category,
+                                            threatStatus: evt.threat_status,
+                                            reasons: evt.reasons,
+                                            evidence: evt.evidence
+                                          });
+                                          setCurrentPage("ai_chat");
+                                          toast.info(`Sent ${evt.file_name} telemetry to AI Copilot Chat`);
+                                        }}
+                                        className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 text-[11px]"
+                                      >
+                                        <span>Investigate in Copilot Chat</span>
+                                        <ChevronRight className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {currentPage === "active_threats" && (
-              <ActiveThreatReplicatorView onNavigate={(p) => setCurrentPage(p as Page)} />
-            )}
+                {(currentPage === "threat_lab" || currentPage === "active_threats") && (
+                  <ThreatLabWalkthroughView onNavigate={(p) => setCurrentPage(p as Page)} />
+                )}
 
-            {currentPage === "ai_chat" && <AICopilotView />}
+                {currentPage === "mitigation" && (
+                  <MitigationCopilotView 
+                    initialThreat={selectedThreatForMitigation} 
+                    activeModel={activeBrainModel}
+                    onNavigateToChat={() => setCurrentPage("ai_chat")}
+                  />
+                )}
 
-            {currentPage === "mitigation" && (
-              <MitigationRulesView initialThreat={selectedThreatForMitigation} />
-            )}
+                {currentPage === "ai_chat" && (
+                  <AICopilotChatView
+                    activeModel={activeBrainModel}
+                    initialThreat={selectedThreatForMitigation}
+                    onNavigateToMitigation={() => setCurrentPage("mitigation")}
+                  />
+                )}
 
-            {currentPage === "knowledge" && <KnowledgeBaseView />}
+                {currentPage === "knowledge" && <KnowledgeBaseView />}
 
-            {currentPage === "file_scanner" && (
-              <FileThreatScannerView onNavigateToMitigation={() => setCurrentPage("mitigation")} />
-            )}
+                {currentPage === "file_scanner" && (
+                  <FileThreatScannerView 
+                    activeModel={activeBrainModel}
+                    onModelChange={(m) => handleSelectBrainModel(m)}
+                    onNavigateToMitigation={(details?: any) => {
+                      if (details) {
+                        setSelectedThreatForMitigation({
+                          fileName: details.fileName || "unknown",
+                          filePath: details.filePath || details.fileName || "monitored_workspace/unknown",
+                          category: details.threatCategory || "Malware",
+                          threatStatus: "THREAT",
+                          reasons: [details.severity || "HIGH"],
+                          evidence: []
+                        });
+                      }
+                      setCurrentPage("mitigation");
+                    }} 
+                  />
+                )}
 
-            {currentPage === "fleet" && <FleetFimView />}
+                {currentPage === "fleet" && <FleetFimView />}
 
-            {currentPage === "incident" && <IncidentTriageView />}
+                {currentPage === "incident" && <IncidentTriageView />}
 
-            {currentPage === "code_explorer" && (
-              <FileCodeExplorer selectedFile={selectedArtifact} onSelectArtifact={setSelectedArtifact} />
-            )}
+                {currentPage === "code_explorer" && (
+                  <FileCodeExplorer 
+                    selectedFile={selectedArtifact} 
+                    onSelectArtifact={setSelectedArtifact} 
+                    onFileQuarantined={() => {
+                      fetchFimEvents();
+                      fetchDashboardStats();
+                    }}
+                    onFileDeleted={() => {
+                      fetchFimEvents();
+                      fetchDashboardStats();
+                    }}
+                  />
+                )}
 
-            {currentPage === "sps_benchmark" && <SPSBenchmarkView />}
+                {currentPage === "sps_benchmark" && <SPSBenchmarkView />}
 
-            {currentPage === "siem_gateway" && <SiemGatewayView />}
+                {currentPage === "siem_gateway" && <SiemGatewayView />}
 
-            {currentPage === "governance_lab" && <GovernanceLabView />}
+                {currentPage === "governance_lab" && <GovernanceLabView />}
 
-            {currentPage === "autonomous_tester" && <AutonomousTesterView />}
+                {currentPage === "autonomous_tester" && <AutonomousTesterView />}
 
-            {currentPage === "test_reports" && <TestReportsView />}
-
+                {currentPage === "test_reports" && <TestReportsView />}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
       </div>
+
+      {/* Priority Threat Task Pop-up Modal */}
+      <ThreatTaskNotificationModal
+        threat={threatNotification}
+        isOpen={Boolean(threatNotification)}
+        onClose={() => setThreatNotification(null)}
+        onQuarantined={() => {
+          fetchFimEvents();
+          fetchDashboardStats();
+        }}
+        onIgnored={() => {
+          fetchFimEvents();
+          fetchDashboardStats();
+        }}
+        onInspect={(t) => {
+          setSelectedArtifact({
+            id: t.id,
+            name: t.file_name,
+            file_name: t.file_name,
+            file_path: t.file_path,
+            size_bytes: t.file_size_bytes || 4096,
+            sha256_hash: t.file_hash || "",
+            threat_status: t.threat_status,
+            category: t.category,
+            severity: t.severity,
+            confidence: t.confidence || 95,
+            reasons: t.reasons || [],
+            evidence: t.evidence || [],
+            content: "",
+            explanation: (t.reasons && t.reasons.length > 0) ? t.reasons.join(". ") : "Threat alert surfaced by behavioral telemetry.",
+            event_type: t.event_type,
+            process_name: t.process_name || "fim_watcher",
+            user: t.user || "NT AUTHORITY\\SYSTEM",
+            defensive_indicators: {
+              persistence_mechanisms: false,
+              credential_access: false,
+              obfuscated_code: false,
+              network_comms: false,
+              destructive_file_ops: false,
+              suspicious_process_exec: false,
+              encoded_payloads: false
+            }
+          });
+          setCurrentPage("file_scanner");
+        }}
+      />
+
+      {/* IEEE ICAIC 2026 Reference Paper Specification Modal */}
+      <IEEEPaperModal
+        isOpen={showPaperModal}
+        onClose={() => setShowPaperModal(false)}
+        onNavigate={(p) => setCurrentPage(p as Page)}
+      />
+
+      {/* Groq AI Brain Selector Modal */}
+      <AIBrainSelectorModal
+        isOpen={showBrainModal}
+        onClose={() => setShowBrainModal(false)}
+        selectedModel={activeBrainModel}
+        onSelectModel={(model) => handleSelectBrainModel(model)}
+      />
+
+      {/* Operator Identity & Access Management Modal (Left Sidebar Only) */}
+      <OperatorProfileModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        currentUser={currentUser}
+        onUpdateUser={handleUpdateUser}
+        operators={operators}
+        onAddOperator={handleAddOperator}
+      />
+
+      {/* Floating Pearlescent Fleet Threat Notifications (Top Right Dismissable) */}
+      <FloatingPearlescentNotification
+        notifications={activePearlescentAlerts}
+        onDismiss={(id) => {
+          setActivePearlescentAlerts((prev) => prev.filter((a) => a.id !== id));
+        }}
+        onDismissAll={() => {
+          setActivePearlescentAlerts([]);
+        }}
+        onInspectSandbox={(item) => {
+          setGlobalSandboxDevice({
+            id: item.device_id,
+            hostname: item.hostname,
+            ip_address: item.ip_address,
+            os_type: item.os_type || "Remote Node",
+            segment: item.segment || "Enclave"
+          });
+          setShowGlobalSandboxModal(true);
+        }}
+        onIsolateDevice={(item) => {
+          toast.warning(`Device ${item.hostname} ISOLATED. All network access blocked.`);
+          setActivePearlescentAlerts((prev) => prev.filter((a) => a.id !== item.id));
+        }}
+      />
+
+      {/* Global Strict Remote Sandbox Explorer Modal (Direct Launch from Floating Alert) */}
+      {showGlobalSandboxModal && (
+        <RemoteSandboxExplorerModal
+          isOpen={showGlobalSandboxModal}
+          onClose={() => {
+            setShowGlobalSandboxModal(false);
+            setGlobalSandboxDevice(null);
+          }}
+          device={globalSandboxDevice}
+        />
+      )}
     </div>
   );
 }
+

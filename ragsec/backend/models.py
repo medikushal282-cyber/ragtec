@@ -11,6 +11,7 @@ import datetime
 class SensitivityTier(str, Enum):
     PUBLIC = "public"
     INTERNAL = "internal"
+    CONFIDENTIAL = "confidential"
     RESTRICTED = "restricted"
 
 class IncidentSeverity(str, Enum):

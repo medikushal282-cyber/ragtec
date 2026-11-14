@@ -13,7 +13,7 @@ import datetime
 from typing import Dict, Any, List, Optional
 
 from config import settings
-from analysis.static_analyzer import run_static_analysis, compute_sha256
+from analysis.static_analyzer import run_static_analysis, compute_sha256, generate_remediated_code
 from analysis.file_classifier import classify_file
 from db.database import save_file_analysis, save_record
 from domain.audit import audit_service
@@ -208,15 +208,31 @@ def analyze_single_file_with_groq(
     filepath: str,
     api_key: Optional[str] = None,
     model: Optional[str] = None,
-    use_tools: bool = True
+    use_tools: bool = True,
+    provider: Optional[str] = "groq"
 ) -> Dict[str, Any]:
     """
-    Performs full static and AI-grounded threat analysis on a single file using Groq models.
+    Performs full static and AI-grounded threat analysis on a single file using configured models.
     Supports tool calling for entropy, CTI lookup, and de-obfuscation.
     """
     filename = os.path.basename(filepath)
     groq_key = api_key or settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
-    groq_model = model or settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+    raw_model = model or settings.GROQ_MODEL or "openai/gpt-oss-120b"
+    
+    # Map friendly aliases to exact Groq IDs without breaking explicit IDs
+    rm_lower = raw_model.lower().strip()
+    if "120b" in rm_lower:
+        groq_model = "openai/gpt-oss-120b"
+    elif "safeguard" in rm_lower:
+        groq_model = "openai/gpt-oss-safeguard-20b"
+    elif "20b" in rm_lower:
+        groq_model = "openai/gpt-oss-20b"
+    elif "qwen" in rm_lower and "distill" not in rm_lower:
+        groq_model = "qwen/qwen3.8-27b"
+    else:
+        groq_model = raw_model.strip()
+        
+    active_provider = (provider or "builtin").lower()
 
     if not os.path.exists(filepath):
         return {
@@ -250,27 +266,66 @@ def analyze_single_file_with_groq(
         for s in static_res.signals
     ]
 
-    # Sample text for AI Prompt
+    # Sample and full text for AI Prompt & deep content inspection
     try:
-        content_text = raw_bytes.decode("utf-8", errors="replace")[:4000]
+        content_text = raw_bytes.decode("utf-8", errors="replace")
     except Exception:
-        content_text = str(raw_bytes[:2000])
+        content_text = str(raw_bytes[:8000])
+
+    # Automatic payload deobfuscation check across full content
+    decoded_threat_signals = []
+    b64_matches = re.findall(r'[A-Za-z0-9+/]{20,}={0,2}', content_text)
+    for b64_str in b64_matches[:10]:
+        dec_res = tool_decode_payload(b64_str)
+        if dec_res.get("status") == "SUCCESS":
+            for stream_k, stream_v in dec_res.get("decoded_streams", {}).items():
+                v_lower = stream_v.lower()
+                if any(kw in v_lower for kw in ["mimikatz", "dumpcreds", "vssadmin", "shadowcopy", "downloadstring", "virtualalloc", "invoke-expression"]):
+                    decoded_threat_signals.append({
+                        "encoded": b64_str[:30] + "...",
+                        "decoded": stream_v[:120],
+                        "stream_type": stream_k
+                    })
+
+    # Add decoded payload findings into static signals
+    for dts in decoded_threat_signals:
+        rule_signals.append({
+            "line_no": 1,
+            "label": f"Obfuscated Payload Decoded: {dts['decoded'][:60]}",
+            "weight": 3,
+            "content": dts["decoded"]
+        })
 
     entropy_data = tool_calculate_entropy(content_text)
     tools_executed_log = []
 
     # 3. Call Groq API if key is available
     ai_verdict = None
+    vuln_signals = [
+        {
+            "line_no": v.line_no,
+            "vulnerability_type": v.vulnerability_type,
+            "cwe": v.cwe,
+            "title": v.title,
+            "severity": v.severity,
+            "description": v.description,
+            "content": v.line_content
+        }
+        for v in (static_res.vulnerabilities if static_res else [])
+    ]
+
     if groq_key and "gsk_" in groq_key:
         try:
             system_prompt = (
-                "You are an Autonomous Cybersecurity Malware Analyst and EDR Engine. "
-                "Analyze the provided file statically. Determine definitively whether the file is UNSAFE (THREAT) or SAFE (BENIGN). "
-                "You have access to tools for entropy calculation, CTI search, payload decoding, and PE import scanning. "
+                "You are an Autonomous Cybersecurity Malware Analyst and SAST Application Security Auditor. "
+                "Analyze the provided file statically. Determine definitively whether the file is:\n"
+                "1. UNSAFE: Active malware, ransomware, C2 beacon, web shell backdoor, Trojan, or destructive exploit payload.\n"
+                "2. VULNERABLE: Application code containing security vulnerabilities (e.g. SQL Injection CWE-89, Command Injection CWE-78, Hardcoded Secrets CWE-798, Path Traversal CWE-22, Insecure Deserialization CWE-502, XSS CWE-79, Weak Cryptography CWE-327) that can be exploited by an adversary.\n"
+                "3. SAFE: Clean, benign application code or documentation with no active threats or exploitable vulnerabilities.\n"
                 "Output your final judgment in strict JSON format with keys: "
-                "'is_threat' (boolean), 'verdict' ('UNSAFE' or 'SAFE'), 'threat_category' (e.g., 'Ransomware', 'Trojan', 'Web Shell', 'Suspicious Script / Execution', 'Malware', 'Benign'), "
+                "'is_threat' (boolean), 'is_vulnerable' (boolean), 'verdict' ('UNSAFE', 'VULNERABLE', or 'SAFE'), 'threat_category' (e.g., 'Ransomware', 'Vulnerable Code: SQL Injection', 'Vulnerable Code: Command Injection', 'Trojan', 'Benign'), "
                 "'severity' ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW'), 'confidence' (float 0.0-1.0), 'risk_score' (int 0-100), "
-                "'summary' (string detailed technical rationale), 'flagged_indicators' (list of strings), 'mitigation_action' (string actionable containment instruction)."
+                "'summary' (string detailed technical rationale), 'flagged_indicators' (list of strings), 'mitigation_action' (string actionable containment or patch instruction), 'vulnerability_type' (optional string)."
             )
 
             user_msg = (
@@ -278,7 +333,8 @@ def analyze_single_file_with_groq(
                 f"Filename: {filename}\n"
                 f"SHA-256: {sha256}\n"
                 f"File Size: {file_size} bytes\n"
-                f"Static Heuristic Signals Found ({len(rule_signals)}): {json.dumps(rule_signals)}\n"
+                f"Static Malware Heuristic Signals Found ({len(rule_signals)}): {json.dumps(rule_signals)}\n"
+                f"SAST Vulnerability Signals Found ({len(vuln_signals)}): {json.dumps(vuln_signals)}\n"
                 f"Measured Entropy: {entropy_data['entropy']} ({entropy_data['assessment']})\n\n"
                 f"=== FILE CONTENT SNIPPET ===\n"
                 f"{content_text}\n"
@@ -351,49 +407,177 @@ def analyze_single_file_with_groq(
         except Exception as e:
             print(f"[Groq Agent] Analysis failed for {filename}: {e}")
 
-    # 4. Fallback / Deterministic Aggregation
-    is_threat = (
-        (ai_verdict and ai_verdict.get("is_threat")) or
-        len(rule_signals) >= 1 or
-        "ransom" in filename.lower() or "malware" in filename.lower() or "backdoor" in filename.lower()
-    )
+    # 4. Multi-Factor Content Risk Score & Verdict Determination
+    vulnerabilities = static_res.vulnerabilities if static_res else []
+    is_vulnerable = False
+    vuln_details = None
+    mitigation_options = []
+    suggested_patch = None
 
-    threat_category = (
-        ai_verdict.get("threat_category") if ai_verdict and ai_verdict.get("threat_category") else
-        ("Ransomware" if "ransom" in filename.lower() else
-         "Trojan / Backdoor" if "backdoor" in filename.lower() else
-         "Suspicious Script / Execution" if "script" in filename.lower() else
-         "Malware" if len(rule_signals) > 0 else "Benign")
-    )
+    if ai_verdict:
+        # The AI Model directly analyzed the code and delivered its verdict
+        ai_verdict_str = str(ai_verdict.get("verdict", "")).upper()
+        ai_is_threat = bool(ai_verdict.get("is_threat", False)) or (ai_verdict_str == "UNSAFE")
+        ai_is_vuln = bool(ai_verdict.get("is_vulnerable", False)) or (ai_verdict_str == "VULNERABLE")
 
-    severity = (
-        ai_verdict.get("severity") if ai_verdict and ai_verdict.get("severity") else
-        ("CRITICAL" if is_threat and (len(rule_signals) >= 2 or "ransom" in filename.lower()) else
-         "HIGH" if is_threat else "LOW")
-    )
+        if ai_verdict_str == "SAFE" or (not ai_is_threat and not ai_is_vuln and ai_verdict_str != "UNSAFE"):
+            is_threat = False
+            is_vulnerable = False
+            verdict = "SAFE"
+            threat_state = "SAFE"
+            threat_category = "Benign"
+            severity = "LOW"
+            entropy_val = entropy_data.get("entropy", 0.0)
+            risk_score = int(ai_verdict.get("risk_score") or min(15, max(0, int(entropy_val * 2))))
+            summary = ai_verdict.get("summary") or "AI Model static code review verified: clean, benign application file."
+            flagged_indicators = ai_verdict.get("flagged_indicators") or []
+            mitigation_action = ai_verdict.get("mitigation_action") or "No defensive intervention required."
+            mitigation_options = []
 
-    risk_score = (
-        ai_verdict.get("risk_score") if ai_verdict and isinstance(ai_verdict.get("risk_score"), (int, float)) else
-        (100 if "ransom" in filename.lower() else
-         96 if "backdoor" in filename.lower() else
-         92 if "script" in filename.lower() else
-         95 if is_threat else 10)
-    )
+        elif ai_is_vuln and not ai_is_threat:
+            is_threat = False
+            is_vulnerable = True
+            verdict = "VULNERABLE"
+            threat_state = "VULNERABLE"
+            prim_vuln = vulnerabilities[0] if vulnerabilities else None
+            vuln_type = prim_vuln.vulnerability_type if prim_vuln else (ai_verdict.get("vulnerability_type") or "SQL_INJECTION")
+            cwe_str = prim_vuln.cwe if prim_vuln else (ai_verdict.get("cwe") or "CWE-89")
+            title_str = prim_vuln.title if prim_vuln else (ai_verdict.get("threat_category") or "SQL Injection")
+            threat_category = f"Vulnerable Code: {title_str}"
+            severity = str(ai_verdict.get("severity") or (prim_vuln.severity if prim_vuln else "HIGH")).upper()
+            risk_score = int(ai_verdict.get("risk_score") or (prim_vuln.risk_score if prim_vuln else 65))
+            summary = ai_verdict.get("summary") or (f"SAST Code Analysis: {title_str} ({cwe_str}) detected." if prim_vuln else "Security flaw identified in code.")
+            flagged_indicators = ai_verdict.get("flagged_indicators") or ([f"Line {v.line_no}: {v.title} ({v.cwe})" for v in vulnerabilities] if vulnerabilities else [])
+            mitigation_action = ai_verdict.get("mitigation_action") or (prim_vuln.recommended_mitigation if prim_vuln else "Apply code remediation patch")
+            mitigation_options = prim_vuln.mitigation_options if prim_vuln else [{"id": "patch", "label": "Apply SAST Patch", "icon": "tool", "action": "AUTO_PATCH"}]
+            suggested_patch = generate_remediated_code(content_text, vuln_type)
+            vuln_details = {
+                "vulnerability_type": vuln_type,
+                "cwe": cwe_str,
+                "title": title_str,
+                "severity": severity,
+                "line_no": prim_vuln.line_no if prim_vuln else 1,
+                "line_content": prim_vuln.line_content if prim_vuln else "",
+                "description": summary,
+                "recommended_mitigation": mitigation_action,
+                "mitigation_options": mitigation_options,
+                "suggested_patch": suggested_patch
+            }
 
-    summary = (
-        ai_verdict.get("summary") if ai_verdict and ai_verdict.get("summary") else
-        (f"Deterministic inspection detected {len(rule_signals)} suspicious behavioral signals. Risk score: {risk_score}/100." if is_threat else "No malicious patterns detected. File is safe.")
-    )
+        else:
+            # Active threat detected by AI Model
+            is_threat = True
+            is_vulnerable = False
+            verdict = "UNSAFE"
+            threat_state = "THREAT"
+            threat_category = ai_verdict.get("threat_category") or "Malware / Exploit"
+            severity = str(ai_verdict.get("severity", "CRITICAL")).upper()
+            risk_score = int(ai_verdict.get("risk_score") or 90)
+            summary = ai_verdict.get("summary") or "AI Model identified malicious code behavior."
+            flagged_indicators = ai_verdict.get("flagged_indicators") or [f"Line {s['line_no']}: {s['label']}" for s in rule_signals]
+            mitigation_action = ai_verdict.get("mitigation_action") or "Isolate file into .quarantine/ enclave and revoke execution permissions."
+            mitigation_options = [
+                {"id": "mitigate", "label": "Mitigate", "icon": "zap", "action": "MITIGATE"},
+                {"id": "quarantine", "label": "Quarantine", "icon": "lock", "action": "QUARANTINE"}
+            ]
 
-    flagged_indicators = (
-        ai_verdict.get("flagged_indicators") if ai_verdict and ai_verdict.get("flagged_indicators") else
-        [f"Line {s['line_no']}: {s['label']}" for s in rule_signals]
-    )
+    else:
+        # Fallback to local deterministic static analysis when AI is offline
+        weight_3_signals = [s for s in rule_signals if s.get("weight", 0) >= 3]
+        weight_2_signals = [s for s in rule_signals if s.get("weight", 0) == 2]
+        weight_1_signals = [s for s in rule_signals if s.get("weight", 0) == 1]
+        signal_points = (len(weight_3_signals) * 35) + (len(weight_2_signals) * 20) + (len(weight_1_signals) * 10)
+        has_critical_signal = len(weight_3_signals) > 0 or len(decoded_threat_signals) > 0
 
-    mitigation_action = (
-        ai_verdict.get("mitigation_action") if ai_verdict and ai_verdict.get("mitigation_action") else
-        (f"Isolate file into .quarantine/ enclave and revoke process execution permissions." if is_threat else "None required.")
-    )
+        entropy_val = entropy_data.get("entropy", 0.0)
+        entropy_points = 25 if entropy_val >= 7.2 and file_size >= 256 else (15 if entropy_val >= 6.8 and file_size >= 256 else 0)
+        raw_content_score = signal_points + entropy_points
+
+        if vulnerabilities and not has_critical_signal and len(rule_signals) <= 1:
+            is_vulnerable = True
+            is_threat = False
+            prim_vuln = vulnerabilities[0]
+            verdict = "VULNERABLE"
+            threat_state = "VULNERABLE"
+            threat_category = f"Vulnerable Code: {prim_vuln.title}"
+            severity = prim_vuln.severity.upper()
+            risk_score = prim_vuln.risk_score
+            summary = f"SAST Code Analysis: {prim_vuln.title} ({prim_vuln.cwe}) detected at line {prim_vuln.line_no}."
+            flagged_indicators = [f"Line {v.line_no}: {v.title} ({v.cwe}) - {v.line_content}" for v in vulnerabilities]
+            mitigation_action = prim_vuln.recommended_mitigation
+            mitigation_options = prim_vuln.mitigation_options
+            vuln_type = prim_vuln.vulnerability_type
+            suggested_patch = generate_remediated_code(content_text, vuln_type)
+            vuln_details = {
+                "vulnerability_type": vuln_type,
+                "cwe": prim_vuln.cwe,
+                "title": prim_vuln.title,
+                "severity": severity,
+                "line_no": prim_vuln.line_no,
+                "line_content": prim_vuln.line_content,
+                "description": prim_vuln.description,
+                "recommended_mitigation": mitigation_action,
+                "mitigation_options": mitigation_options,
+                "suggested_patch": suggested_patch
+            }
+        elif has_critical_signal or len(rule_signals) >= 2 or raw_content_score >= 60:
+            is_threat = True
+            is_vulnerable = False
+            verdict = "UNSAFE"
+            threat_state = "THREAT"
+            risk_score = min(100, max(75, int(raw_content_score)))
+            signals_text = " ".join(s.get("label", "") + " " + s.get("content", "") for s in rule_signals).lower()
+            if "shadow copy" in signals_text or "vssadmin" in signals_text or "encrypt" in signals_text or "ransom" in signals_text:
+                threat_category = "Ransomware"
+                severity = "CRITICAL"
+            elif "mimikatz" in signals_text or "dumpcreds" in signals_text or "credential" in signals_text or "lsass" in signals_text:
+                threat_category = "Credential Theft / Trojan"
+                severity = "CRITICAL"
+            elif "process injection" in signals_text or "virtualalloc" in signals_text:
+                threat_category = "PE Injection / Shellcode"
+                severity = "CRITICAL"
+            elif "web shell" in signals_text or "eval" in signals_text:
+                threat_category = "Web Shell / Backdoor"
+                severity = "HIGH"
+            else:
+                threat_category = "Malware / Suspicious Script"
+                severity = "HIGH"
+            summary = f"Deterministic static heuristics detected {len(rule_signals)} suspicious behavioral signals."
+            flagged_indicators = [f"Line {s['line_no']}: {s['label']}" for s in rule_signals]
+            mitigation_action = "Isolate file into .quarantine/ enclave and revoke execution permissions."
+            mitigation_options = [
+                {"id": "mitigate", "label": "Mitigate", "icon": "zap", "action": "MITIGATE"},
+                {"id": "quarantine", "label": "Quarantine", "icon": "lock", "action": "QUARANTINE"}
+            ]
+        else:
+            is_threat = False
+            is_vulnerable = False
+            verdict = "SAFE"
+            threat_state = "SAFE"
+            threat_category = "Benign"
+            severity = "LOW"
+            risk_score = min(15, max(0, int(entropy_val * 2)))
+            summary = "Static inspection verified: clean file with no indicators of compromise."
+            flagged_indicators = []
+            mitigation_action = "No intervention needed."
+            mitigation_options = []
+        verdict = "SAFE"
+        threat_state = "SAFE"
+        threat_category = "Benign"
+        severity = "LOW"
+        risk_score = min(risk_score, 20)
+        summary = (
+            ai_verdict.get("summary") if (ai_verdict and ai_verdict.get("summary")) else
+            "No malicious patterns or exploitable vulnerabilities detected. File is safe."
+        )
+        flagged_indicators = []
+        mitigation_action = "None required."
+        mitigation_options = []
+
+    if ai_verdict:
+        analyzed_by_str = f"Groq ({groq_model})" if active_provider == "groq" else f"AI Agent ({groq_model})"
+    else:
+        analyzed_by_str = "RAGSec SAST & Threat Engine"
 
     final_report = {
         "filename": filename,
@@ -402,17 +586,22 @@ def analyze_single_file_with_groq(
         "file_size": file_size,
         "entropy": entropy_data["entropy"],
         "is_threat": bool(is_threat),
-        "verdict": "UNSAFE" if is_threat else "SAFE",
+        "is_vulnerable": bool(is_vulnerable),
+        "verdict": verdict,
+        "threat_state": threat_state,
         "threat_category": threat_category,
         "severity": severity.upper(),
-        "confidence": ai_verdict.get("confidence", 0.98 if is_threat else 0.95) if ai_verdict else 0.96,
+        "confidence": ai_verdict.get("confidence", 0.98 if (is_threat or is_vulnerable) else 0.95) if ai_verdict else 0.96,
         "risk_score": int(risk_score),
         "summary": summary,
         "flagged_indicators": flagged_indicators,
         "mitigation_action": mitigation_action,
+        "mitigation_options": mitigation_options,
+        "vulnerability_details": vuln_details,
+        "suggested_patch": suggested_patch,
         "deterministic_signals": rule_signals,
         "tools_executed": tools_executed_log,
-        "analyzed_by": f"Groq ({groq_model})" if ai_verdict else "RAGSec Deterministic Engine",
+        "analyzed_by": analyzed_by_str,
         "timestamp": datetime.datetime.now(datetime.UTC).isoformat()
     }
 
@@ -426,15 +615,15 @@ def analyze_single_file_with_groq(
             "sha256": sha256,
             "timestamp": final_report["timestamp"],
             "data_source": "live",
-            "classification": "THREAT" if is_threat else "BENIGN",
+            "classification": "THREAT" if is_threat else ("VULNERABLE_CODE" if is_vulnerable else "BENIGN"),
             "threat_category": threat_category,
-            "threat_state": "THREAT" if is_threat else "SAFE",
+            "threat_state": threat_state,
             "severity": severity.lower(),
             "risk_score": risk_score,
             "rationale": summary,
             "deterministic_signals": rule_signals,
             "ai_analysis": summary if ai_verdict else None,
-            "ai_provider": "Groq Cloud" if ai_verdict else "Deterministic"
+            "ai_provider": "Groq Cloud" if ai_verdict else "Deterministic SAST"
         })
     except Exception:
         pass
@@ -450,11 +639,12 @@ def scan_workspace_with_groq_agent(
     workspace_dir: Optional[str] = None,
     api_key: Optional[str] = None,
     model: Optional[str] = None,
-    use_tools: bool = True
+    use_tools: bool = True,
+    provider: Optional[str] = "builtin"
 ) -> Dict[str, Any]:
     """
     Scans all files in the given directory or default monitored_workspace/
-    using the Groq AI Threat Detection Agent.
+    using the AI Threat Detection Agent.
     """
     target_dir = workspace_dir or os.environ.get(
         "RAGSEC_MONITORED_DIR",
@@ -483,7 +673,8 @@ def scan_workspace_with_groq_agent(
             filepath=fp,
             api_key=api_key,
             model=model,
-            use_tools=use_tools
+            use_tools=use_tools,
+            provider=provider
         )
         results.append(report)
         if report["is_threat"]:
@@ -493,10 +684,16 @@ def scan_workspace_with_groq_agent(
 
     # Log audit event
     audit_service.log_event(
-        actor="GROQ_AI_THREAT_AGENT",
+        actor="AI_THREAT_AGENT",
         action="BATCH_WORKSPACE_ANALYSIS",
         target=target_dir,
         result=f"Scanned {len(file_list)} files: {unsafe_count} UNSAFE threats flagged, {clean_count} clean."
+    )
+
+    provider_name = (
+        "Groq Cloud API" if (api_key and "gsk_" in api_key) else
+        f"Local {provider.capitalize()}" if (provider and provider in ("ollama", "lmstudio")) else
+        "RAGSec Grounded Engine"
     )
 
     return {
@@ -506,8 +703,8 @@ def scan_workspace_with_groq_agent(
         "threats_detected": unsafe_count,
         "clean_files": clean_count,
         "threat_index": "CRITICAL" if unsafe_count >= 3 else ("ELEVATED" if unsafe_count >= 1 else "NOMINAL"),
-        "model_used": model or "llama-3.3-70b-versatile",
-        "provider": "Groq Cloud API" if (api_key and "gsk_" in api_key) else "Hybrid Grounded Engine",
+        "model_used": model or "openai/gpt-oss-120b",
+        "provider": provider_name,
         "tools_enabled": use_tools,
         "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "files": results

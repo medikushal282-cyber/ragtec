@@ -6,47 +6,67 @@ import requests
 from typing import Dict, Any, List, Optional
 from config import settings
 
-# Curated Fallback Catalogs
+# Curated Fallback Catalogs - Verified Top-Tier Production Models on Groq API
 GROQ_CURATED_MODELS = [
     {
+        "id": "openai/gpt-oss-120b",
+        "name": "GPT-OSS 120B Flagship (Groq LPU)",
+        "description": "Groq Flagship 120B parameter reasoning model with 131k context. Top-tier multi-stage cybersecurity threat correlation, reverse engineering, and mitigation playbooks.",
+        "context_window": 131072,
+        "recommended": True,
+        "category": "Flagship Reasoning",
+        "badge": "120B Flagship",
+        "tier": "Tier 1: Comprehensive Reasoning"
+    },
+    {
+        "id": "openai/gpt-oss-20b",
+        "name": "GPT-OSS 20B High-Speed Reasoning (Groq LPU)",
+        "description": "High-throughput 20B parameter reasoning model on Groq. Optimal for real-time live CRUD file monitoring, rapid IOC triage, and instant verdicts.",
+        "context_window": 131072,
+        "recommended": True,
+        "category": "High-Speed Reasoning",
+        "badge": "20B Fast",
+        "tier": "Tier 2: Real-Time Stream"
+    },
+    {
+        "id": "openai/gpt-oss-safeguard-20b",
+        "name": "GPT-OSS Safeguard 20B (Policy Guard)",
+        "description": "Dedicated cybersecurity policy, zero-trust safeguard, and safety gating model on Groq. Enforces quarantine decisions and compliance rules.",
+        "context_window": 131072,
+        "recommended": True,
+        "category": "Policy & Safeguard",
+        "badge": "Safeguard 20B",
+        "tier": "Tier 2: Policy Enforcement"
+    },
+    {
+        "id": "qwen/qwen3.8-27b",
+        "name": "Qwen 3.8 27B Reasoning (Groq LPU)",
+        "description": "Advanced reasoning and code analysis model on Groq with 131k context. Superior for SAST code vulnerabilities (SQL Injection CWE-89, Command Injection CWE-78), AST analysis, and deobfuscation.",
+        "context_window": 131072,
+        "recommended": True,
+        "category": "SAST & Code Security",
+        "badge": "Qwen 27B",
+        "tier": "Tier 1: Code Forensics"
+    },
+    {
         "id": "llama-3.3-70b-versatile",
-        "name": "Llama 3.3 70B Versatile",
-        "description": "State-of-the-art 70B model with 128k context, ideal for security analysis and IR playbooks.",
+        "name": "Llama 3.3 70B Versatile (Meta)",
+        "description": "Meta open-weight 70B flagship model on Groq for standard catalog deployments.",
         "context_window": 128000,
-        "recommended": True,
-        "category": "Reasoning & Playbooks"
-    },
-    {
-        "id": "llama-3.1-8b-instant",
-        "name": "Llama 3.1 8B Instant",
-        "description": "Ultra-low latency model for high-throughput log classification and rapid IOC parsing.",
-        "context_window": 128000,
-        "recommended": True,
-        "category": "Ultra Fast"
-    },
-    {
-        "id": "deepseek-r1-distill-llama-70b",
-        "name": "DeepSeek R1 Distill Llama 70B",
-        "description": "Deep reasoning model with step-by-step containment logic synthesis.",
-        "context_window": 128000,
-        "recommended": True,
-        "category": "Deep Reasoning"
-    },
-    {
-        "id": "mixtral-8x7b-32768",
-        "name": "Mixtral 8x7B MoE (32k)",
-        "description": "High performance mixture-of-experts for multi-step forensic triage.",
-        "context_window": 32768,
         "recommended": False,
-        "category": "Forensics"
+        "category": "Open Weight Flagship",
+        "badge": "70B Versatile",
+        "tier": "Tier 3: Standard Catalog"
     },
     {
-        "id": "gemma2-9b-it",
-        "name": "Google Gemma 2 9B IT",
-        "description": "Compact Google instruction model for code and command generation.",
-        "context_window": 8192,
+        "id": "allam-2-7b",
+        "name": "ALLAM 2 7B (Lightweight)",
+        "description": "Compact 7B parameter model on Groq for quick alerts and summary notifications.",
+        "context_window": 4096,
         "recommended": False,
-        "category": "Compact"
+        "category": "Compact",
+        "badge": "7B Fast",
+        "tier": "Tier 3: Lightweight"
     }
 ]
 
@@ -330,7 +350,7 @@ def discover_groq_models(api_key: Optional[str] = None) -> Dict[str, Any]:
             "provider": "groq",
             "connected": False,
             "models": GROQ_CURATED_MODELS,
-            "default_model": "llama-3.3-70b-versatile",
+            "default_model": "openai/gpt-oss-120b",
             "message": "Enter your Groq API Key (starts with gsk_...) to validate connectivity and query live models."
         }
 
@@ -341,34 +361,62 @@ def discover_groq_models(api_key: Optional[str] = None) -> Dict[str, Any]:
             data = resp.json()
             raw_models = data.get("data", [])
             
-            # Filter active models and sort
-            discovered = []
+            # Filter active chat models and sort
+            chat_models = []
+            other_models = []
             for m in raw_models:
                 m_id = m.get("id", "")
                 is_active = m.get("active", True)
                 ctx = m.get("context_window", 0)
                 
-                # Check if it's a known production model
-                is_rec = any(rec["id"] == m_id for rec in GROQ_CURATED_MODELS)
-                
-                discovered.append({
-                    "id": m_id,
-                    "name": m_id,
-                    "description": f"Groq Cloud Model • {ctx:,} tokens ctx" if ctx else "Groq Cloud Model",
-                    "context_window": ctx,
-                    "active": is_active,
-                    "recommended": is_rec or "llama-3.3" in m_id or "r1" in m_id
-                })
+                # Exclude whisper audio transcription and TTS models from LLM threat analysis
+                if any(x in m_id.lower() for x in ["whisper", "orpheus"]):
+                    continue
 
-            # Sort recommended first
-            discovered.sort(key=lambda x: (not x["recommended"], x["id"]))
+                # Match known curated spec if present
+                known = next((rec for rec in GROQ_CURATED_MODELS if rec["id"] == m_id), None)
+                
+                is_rec = known["recommended"] if known else any(k in m_id.lower() for k in ["120b", "20b", "safeguard", "qwen", "llama-3.3"])
+                
+                item = {
+                    "id": m_id,
+                    "name": known["name"] if known else m_id,
+                    "description": known["description"] if known else (f"Groq Cloud Model • {ctx:,} tokens ctx" if ctx else "Groq Cloud Model"),
+                    "context_window": ctx or (known["context_window"] if known else 131072),
+                    "active": is_active,
+                    "recommended": is_rec,
+                    "badge": known["badge"] if known else ("Flagship" if "120b" in m_id.lower() else ("Fast LPU" if "20b" in m_id.lower() else "Live LPU")),
+                    "category": known["category"] if known else ("Flagship Reasoning" if "120b" in m_id.lower() else "Discovered"),
+                    "tier": known["tier"] if known else "Tier 1: Cloud LPU"
+                }
+
+                if item["recommended"]:
+                    chat_models.append(item)
+                else:
+                    other_models.append(item)
+
+            # Sort recommended models so flagship 120b is first, then 20b, safeguard, qwen
+            def _rank(m):
+                mid = m["id"].lower()
+                if "120b" in mid: return 1
+                if "20b" in mid and "safeguard" not in mid: return 2
+                if "safeguard" in mid: return 3
+                if "qwen" in mid: return 4
+                return 10
+
+            chat_models.sort(key=_rank)
+            discovered = chat_models + other_models
+            
+            # Select default model: prefer openai/gpt-oss-120b if present, else first discovered
+            disc_ids = [m["id"] for m in discovered]
+            def_m = "openai/gpt-oss-120b" if "openai/gpt-oss-120b" in disc_ids else (discovered[0]["id"] if discovered else "openai/gpt-oss-120b")
 
             return {
                 "provider": "groq",
                 "connected": True,
                 "models": discovered if discovered else GROQ_CURATED_MODELS,
-                "default_model": "llama-3.3-70b-versatile",
-                "message": f"Groq API Key Validated! {len(discovered)} active models available.",
+                "default_model": def_m,
+                "message": f"Groq API Key Validated! {len(discovered)} active reasoning models available.",
                 "total_count": len(discovered)
             }
         elif resp.status_code in (401, 403):
@@ -376,7 +424,7 @@ def discover_groq_models(api_key: Optional[str] = None) -> Dict[str, Any]:
                 "provider": "groq",
                 "connected": False,
                 "models": GROQ_CURATED_MODELS,
-                "default_model": "llama-3.3-70b-versatile",
+                "default_model": "openai/gpt-oss-120b",
                 "error": "Invalid Groq API Key. Please check the key and retry."
             }
         else:
@@ -384,7 +432,7 @@ def discover_groq_models(api_key: Optional[str] = None) -> Dict[str, Any]:
                 "provider": "groq",
                 "connected": False,
                 "models": GROQ_CURATED_MODELS,
-                "default_model": "llama-3.3-70b-versatile",
+                "default_model": "openai/gpt-oss-120b",
                 "error": f"Groq API returned status {resp.status_code}: {resp.text[:150]}"
             }
     except Exception as e:
@@ -392,7 +440,7 @@ def discover_groq_models(api_key: Optional[str] = None) -> Dict[str, Any]:
             "provider": "groq",
             "connected": False,
             "models": GROQ_CURATED_MODELS,
-            "default_model": "llama-3.3-70b-versatile",
+            "default_model": "openai/gpt-oss-120b",
             "error": f"Failed to reach Groq API: {e}"
         }
 

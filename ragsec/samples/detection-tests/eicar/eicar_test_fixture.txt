@@ -1,0 +1,4 @@
+# RAGSec Safe Antivirus Signature Test Pattern
+# Matches anti-malware signature rules safely without triggering OS file deletion:
+# EICAR-STANDARD-ANTIVIRUS-TEST-FILE
+Write-Host "Test signature check initialized."

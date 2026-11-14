@@ -1,0 +1,134 @@
+[
+  {
+    "id": "LOG-FLT-25782",
+    "device_id": "DEV-LAPTOP-FIN02",
+    "hostname": "FINANCE-LAPTOP-02",
+    "ip_address": "192.168.1.45",
+    "event_type": "REMOTE_SANDBOX_THREAT_INTERCEPT",
+    "threat_status": "THREAT",
+    "threat_category": "Ransomware",
+    "threat_name": "LockBit 3.0 High-Entropy Encryption Trigger",
+    "file_name": "client_portfolio_records.enc",
+    "file_path": "monitored_workspace/fleet_sandboxes/DEV-LAPTOP-FIN02/client_portfolio_records.enc",
+    "severity": "CRITICAL",
+    "confidence": 97,
+    "timestamp": "17:57:05 UTC",
+    "message": "Suspicious ransomware-style mass write anomaly observed in FINANCE-LAPTOP-02 sandbox folder.",
+    "indicators": [
+      "High Entropy 7.91",
+      "Mass File Writes",
+      "Volume Shadow Copy Deletion Blocked"
+    ],
+    "action_taken": "Automated Sandbox Enclave Alert Dispatched"
+  },
+  {
+    "id": "LOG-FLT-77905",
+    "device_id": "DEV-LOCAL-01",
+    "hostname": "RAGSEC-MASTER-HOST",
+    "ip_address": "127.0.0.1",
+    "event_type": "REMOTE_SANDBOX_THREAT_INTERCEPT",
+    "threat_status": "THREAT",
+    "threat_category": "Ransomware",
+    "threat_name": "LockBit 3.0 High-Entropy Encryption Trigger",
+    "file_name": "client_portfolio_records.enc",
+    "file_path": "monitored_workspace/client_portfolio_records.enc",
+    "severity": "CRITICAL",
+    "confidence": 97,
+    "timestamp": "17:51:17 UTC",
+    "message": "Suspicious ransomware-style mass write anomaly observed in RAGSEC-MASTER-HOST sandbox folder.",
+    "indicators": [
+      "High Entropy 7.91",
+      "Mass File Writes",
+      "Volume Shadow Copy Deletion Blocked"
+    ],
+    "action_taken": "Automated Sandbox Enclave Alert Dispatched"
+  },
+  {
+    "id": "LOG-FLT-89570",
+    "device_id": "DEV-LAPTOP-FIN02",
+    "hostname": "FINANCE-LAPTOP-02",
+    "ip_address": "192.168.1.45",
+    "event_type": "REMOTE_SANDBOX_THREAT_INTERCEPT",
+    "threat_status": "THREAT",
+    "threat_category": "Ransomware",
+    "threat_name": "LockBit 3.0 High-Entropy Encryption Trigger",
+    "file_name": "client_portfolio_records.enc",
+    "file_path": "monitored_workspace/fleet_sandboxes/DEV-LAPTOP-FIN02/client_portfolio_records.enc",
+    "severity": "CRITICAL",
+    "confidence": 97,
+    "timestamp": "17:39:49 UTC",
+    "message": "Suspicious ransomware-style mass write anomaly observed in FINANCE-LAPTOP-02 sandbox folder.",
+    "indicators": [
+      "High Entropy 7.91",
+      "Mass File Writes",
+      "Volume Shadow Copy Deletion Blocked"
+    ],
+    "action_taken": "Automated Sandbox Enclave Alert Dispatched"
+  },
+  {
+    "id": "LOG-FLT-58631",
+    "device_id": "DEV-LAPTOP-FIN02",
+    "hostname": "FINANCE-LAPTOP-02",
+    "ip_address": "192.168.1.45",
+    "event_type": "REMOTE_SANDBOX_THREAT_INTERCEPT",
+    "threat_status": "THREAT",
+    "threat_category": "Ransomware",
+    "threat_name": "LockBit 3.0 High-Entropy Encryption Trigger",
+    "file_name": "client_portfolio_records.enc",
+    "file_path": "monitored_workspace/fleet_sandboxes/DEV-LAPTOP-FIN02/client_portfolio_records.enc",
+    "severity": "CRITICAL",
+    "confidence": 97,
+    "timestamp": "17:35:58 UTC",
+    "message": "Suspicious ransomware-style mass write anomaly observed in FINANCE-LAPTOP-02 sandbox folder.",
+    "indicators": [
+      "High Entropy 7.91",
+      "Mass File Writes",
+      "Volume Shadow Copy Deletion Blocked"
+    ],
+    "action_taken": "Automated Sandbox Enclave Alert Dispatched"
+  },
+  {
+    "id": "LOG-FLT-88528",
+    "device_id": "DEV-LAPTOP-ENG09",
+    "hostname": "ENG-MACBOOK-PRO-16",
+    "ip_address": "192.168.1.88",
+    "event_type": "REMOTE_SANDBOX_THREAT_INTERCEPT",
+    "threat_status": "THREAT",
+    "threat_category": "Trojan / C2 Dropper",
+    "threat_name": "CobaltStrike Beacon Stager Dropped",
+    "file_name": "invoice_update_stager.ps1",
+    "file_path": "monitored_workspace/fleet_sandboxes/DEV-LAPTOP-ENG09/invoice_update_stager.ps1",
+    "severity": "HIGH",
+    "confidence": 97,
+    "timestamp": "17:26:28 UTC",
+    "message": "Obfuscated PowerShell execution attempt intercepted on ENG-MACBOOK-PRO-16.",
+    "indicators": [
+      "Encoded PowerShell Payload",
+      "Suspicious Base64 IEX",
+      "C2 Callback Prevented"
+    ],
+    "action_taken": "Automated Sandbox Enclave Alert Dispatched"
+  },
+  {
+    "id": "LOG-FLT-801",
+    "device_id": "DEV-LAPTOP-FIN02",
+    "hostname": "FINANCE-LAPTOP-02",
+    "ip_address": "192.168.1.45",
+    "event_type": "FILE_INTEGRITY_VIOLATION",
+    "threat_status": "THREAT",
+    "threat_category": "Ransomware",
+    "threat_name": "LockBit 3.0 Rapid File Encryption Anomaly",
+    "file_name": "q3_payroll_records.enc",
+    "file_path": "monitored_workspace/fleet_sandboxes/DEV-LAPTOP-FIN02/q3_payroll_records.enc",
+    "severity": "CRITICAL",
+    "confidence": 98,
+    "timestamp": "17:25:39 UTC",
+    "message": "High entropy header mutation detected in remote laptop sandbox. Threat payload neutralized by Sentinel FIM.",
+    "indicators": [
+      "High Entropy 7.94/8.0",
+      "Mass Modification Rate > 40 ops/sec",
+      "Ransom Note Dropped"
+    ],
+    "action_taken": "Automated Sandbox Isolation Enforced"
+  }
+]

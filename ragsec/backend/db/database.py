@@ -4,7 +4,9 @@ import json
 from typing import List, Dict, Any, Optional
 
 # Path must be configurable per Master Specification
-DB_PATH = os.environ.get("RAGSEC_DB_PATH", "ragsec.db")
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+_root_dir = os.path.abspath(os.path.join(_backend_dir, "..", ".."))
+DB_PATH = os.environ.get("RAGSEC_DB_PATH", os.path.join(_root_dir, "ragsec.db"))
 
 # Documenting schema:
 # We use a semi-structured approach for the MVP to preserve the complex Pydantic models.
@@ -129,6 +131,16 @@ def get_records_by_fk(table: str, fk_col: str, fk_val: str) -> List[dict]:
     conn.close()
     return [json.loads(row['data']) for row in rows]
 
+def delete_record(table: str, id_val: str) -> bool:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(f'DELETE FROM {table} WHERE id = ?', (id_val,))
+    deleted = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+
 def get_events_by_device(device_id: str) -> List[dict]:
     """Fetch all events attributed to a specific device — uses the indexed device_id column."""
     conn = get_connection()
@@ -198,6 +210,9 @@ def get_knowledge_sources():
         try:
             doc_data = json.loads(d.get('data') or '{}')
             d['doc_type'] = doc_data.get('doc_type', 'THREAT_CLASSIFICATION_INTEL')
+            d['sensitivity_tier'] = d.get('sensitivity_tier') or doc_data.get('sensitivity_tier', 'internal')
+            d['chunking_strategy'] = doc_data.get('chunking_strategy', 'Semantic Paragraphs')
+            d['source_type'] = doc_data.get('source_type', 'cti_report')
             d['target_categories'] = doc_data.get('target_categories', [])
             d['primary_category'] = doc_data.get('primary_category', doc_data.get('target_categories', ['Threat Intelligence'])[0] if doc_data.get('target_categories') else 'Threat Intelligence')
             d['mitigation_steps'] = doc_data.get('mitigation_steps', [])
@@ -205,6 +220,9 @@ def get_knowledge_sources():
             d['confidence'] = doc_data.get('confidence', 0.95)
         except Exception:
             d['doc_type'] = 'THREAT_CLASSIFICATION_INTEL'
+            d['sensitivity_tier'] = 'internal'
+            d['chunking_strategy'] = 'Semantic Paragraphs'
+            d['source_type'] = 'cti_report'
             d['target_categories'] = []
             d['primary_category'] = 'Threat Intelligence'
             d['mitigation_steps'] = []

@@ -36,6 +36,8 @@ class FileAnalysisResult:
     rationale: str
 
     deterministic_signals: List[Dict[str, Any]]  # from static_analyzer
+    entropy: float = 0.0
+    dynamic_analysis: str = "NOT_PERFORMED (Disposable VM sandbox unavailable on host; host execution strictly prohibited)"
     ai_analysis: Optional[str] = None    # raw AI output (clearly labelled)
     ai_provider: Optional[str] = None
     risk_score: float = 0.0
@@ -117,19 +119,26 @@ def classify_file(
         except Exception as e:
             ai_text = f"AI analysis unavailable: {e}"
 
-    # Calculate risk score (0 - 100)
-    risk_score = min(100.0, weight_sum * 18.0)
+    # Calculate risk score (0 - 100) strictly from content signals and entropy
     content_str = str(content).lower()
-    fn_lower = filename.lower()
+    sev3_count = sum(1 for s in signals if s.severity_weight >= 3)
+    sev2_count = sum(1 for s in signals if s.severity_weight == 2)
+    sev1_count = sum(1 for s in signals if s.severity_weight == 1)
 
-    if "ransom" in fn_lower or "encrypt" in fn_lower or "vssadmin" in content_str or "shadowcopy" in content_str:
-        risk_score = max(risk_score, 98.0)
-    elif "backdoor" in fn_lower or "eval" in content_str or "passthru" in content_str or "base64_decode" in content_str:
-        risk_score = max(risk_score, 96.0)
-    elif "malware" in fn_lower or "mimikatz" in content_str or "virtualalloc" in content_str or "createremotethread" in content_str or "dumpcreds" in content_str:
-        risk_score = max(risk_score, 95.0)
-    elif "script" in fn_lower or "suspicious" in fn_lower or "powershell" in content_str or "invoke-expression" in content_str:
-        risk_score = max(risk_score, 90.0)
+    signal_points = (sev3_count * 35) + (sev2_count * 20) + (sev1_count * 10)
+    entropy_points = 25 if static_result.entropy >= 7.2 and len(content) >= 256 else (15 if static_result.entropy >= 6.8 and len(content) >= 256 else 0)
+
+    if "vssadmin" in content_str or "shadowcopy" in content_str or "encrypt" in content_str:
+        signal_points = max(signal_points, 85)
+    elif "eval" in content_str or "passthru" in content_str or "base64_decode" in content_str or "invoke-mimikatz" in content_str:
+        signal_points = max(signal_points, 80)
+    elif "virtualalloc" in content_str or "createremotethread" in content_str or "dumpcreds" in content_str:
+        signal_points = max(signal_points, 80)
+
+    if len(signals) == 0 and signal_points == 0:
+        risk_score = min(15.0, static_result.entropy * 2.0)
+    else:
+        risk_score = min(100.0, max(65.0, float(signal_points + entropy_points)))
 
     # -----------------------------------------------------------------
     # Classification logic:
@@ -137,26 +146,28 @@ def classify_file(
     # UNKNOWN : no deterministic signals but file is binary/unreadable
     # BENIGN  : no signals, not suspicious
     # -----------------------------------------------------------------
-    if weight_sum >= _MIN_THREAT_WEIGHT or risk_score >= 50.0:
+    if weight_sum >= _MIN_THREAT_WEIGHT or risk_score >= 60.0 or sev3_count > 0:
         threat_state = "THREAT"
         signal_text = " ".join(s.label for s in signals)
-        tc = classifier_instance.classify_event(signal_text or filename, is_suspicious=True)
+        tc = classifier_instance.classify_event(signal_text, is_suspicious=True)
         category_val = tc.category.value
         
-        if "ransom" in fn_lower or "vssadmin" in content_str:
+        if "vssadmin" in content_str or "shadowcopy" in content_str or "encrypt" in content_str:
             category_val = "Ransomware"
-        elif "backdoor" in fn_lower or "eval" in content_str or "passthru" in content_str:
+        elif "eval" in content_str or "passthru" in content_str or "base64_decode" in content_str:
             category_val = "Trojan"
-        elif "script" in fn_lower or "powershell" in content_str:
+        elif "virtualalloc" in content_str or "createremotethread" in content_str:
+            category_val = "PE Injection / Shellcode"
+        elif "powershell" in content_str or "invoke-expression" in content_str:
             category_val = "Suspicious Script / Execution"
-        elif "malware" in fn_lower or "virtualalloc" in content_str:
-            category_val = "Malware"
+        elif "mimikatz" in content_str or "dumpcreds" in content_str:
+            category_val = "Credential Theft / Trojan"
 
-        severity = "critical" if (max_w >= 3 and weight_sum >= 5) or "ransom" in fn_lower or risk_score >= 95 else \
-                   "high"     if max_w >= 3 or risk_score >= 80 else \
-                   "medium"   if max_w >= 2 else "low"
+        severity = "critical" if (sev3_count >= 1 or risk_score >= 90) else \
+                   "high"     if max_w >= 2 or risk_score >= 75 else \
+                   "medium"   if max_w >= 1 else "low"
 
-        rationale = f"DETERMINISTIC: {len(signals)} behavioral signal(s) detected (Risk Score {int(risk_score)}/100). " \
+        rationale = f"CONTENT INSPECTION: {len(signals)} behavioral signal(s) detected (Risk Score {int(risk_score)}/100). " \
                     f"Highest-weight signal: '{signals[0].label if signals else 'Heuristic Signature Anomaly'}'."
         if ai_text:
             rationale += " AI ANALYSIS: see ai_analysis field."
@@ -166,6 +177,13 @@ def classify_file(
         category_val = ThreatCategory.UNKNOWN.value
         severity = "low"
         rationale = "DETERMINISTIC: File is binary or unreadable. Evidence insufficient for confident classification."
+    elif getattr(static_result, "vulnerabilities", None):
+        threat_state = "VULNERABLE"
+        prim_v = static_result.vulnerabilities[0]
+        category_val = f"Vulnerable Code: {prim_v.title}"
+        severity = prim_v.severity
+        risk_score = float(prim_v.risk_score)
+        rationale = f"SAST Code Analysis: {prim_v.title} ({prim_v.cwe}) detected at line {prim_v.line_no}. {prim_v.description}"
     else:
         threat_state = "SAFE"
         category_val = ThreatCategory.BENIGN.value
@@ -189,6 +207,8 @@ def classify_file(
         risk_score=risk_score,
         rationale=rationale,
         deterministic_signals=_signals_to_dicts(signals),
+        entropy=static_result.entropy,
+        dynamic_analysis=static_result.dynamic_analysis_status,
         ai_analysis=ai_text,
         ai_provider=ai_provider,
         linked_event_id=linked_event_id,

@@ -1,0 +1,4 @@
+Enrolled Endpoint: qwe
+IP: 10.11.12.13:8000
+OS: Windows 11 Enterprise (23H2)
+Connected: 2026-11-13T17:50:24.830160+00:00

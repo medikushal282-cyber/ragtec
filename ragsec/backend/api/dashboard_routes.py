@@ -29,12 +29,10 @@ ALL_CATEGORIES = [
     "UNKNOWN"
 ]
 
+from config import get_canonical_workspace_dir
+
 def get_workspace_dir() -> str:
-    ws_dir = os.environ.get("RAGSEC_MONITORED_DIR", os.path.abspath(os.path.join(os.getcwd(), "..", "..", "monitored_workspace")))
-    if not os.path.exists(ws_dir):
-        # Fallback to local sibling path
-        ws_dir = os.path.abspath(os.path.join(os.getcwd(), "monitored_workspace"))
-    os.makedirs(ws_dir, exist_ok=True)
+    ws_dir = get_canonical_workspace_dir()
     os.makedirs(os.path.join(ws_dir, ".quarantine"), exist_ok=True)
     return ws_dir
 
@@ -118,17 +116,12 @@ def get_dashboard_stats():
         elif matched_cat == "BENIGN":
             benign_count += 1
 
-    # Ensure baseline minimums if clean state
-    if monitored_events == 0:
-        monitored_events = len(analyses) or 4
-    if threat_count == 0:
-        threat_count = sum(taxonomy_counts[c] for c in ALL_CATEGORIES if c not in ("BENIGN", "UNKNOWN")) or 2
-    if benign_count == 0:
-        benign_count = taxonomy_counts.get("BENIGN", 0) or 1
-
     return {
+        # Field names that match frontend expectations
         "threat_index": "ACTIVE" if threat_count > 0 else "NORMAL",
+        "threat_index_active": threat_count,
         "threat_count": threat_count,
+        "monitored_events_count": monitored_events,
         "monitored_events": monitored_events,
         "benign_count": benign_count,
         "unknown_count": unknown_count,
@@ -141,10 +134,14 @@ def get_dashboard_stats():
 def get_workspace_files():
     """
     Scans physical on-disk files in monitored_workspace/ and performs safe static analysis on each.
-    Returns live metadata, file hashes, size, text preview, and defensive indicator scan flags.
+    Returns live metadata, file hashes, size, text preview, defensive indicators, CRUD operation history,
+    and clear safe/unsafe verdicts with quarantine and deletion capabilities.
     """
+    import datetime
     ws_dir = get_workspace_dir()
     ensure_seed_workspace_files(ws_dir)
+
+    events = get_all_records("events")
 
     results = []
     try:
@@ -155,7 +152,11 @@ def get_workspace_files():
     for fname in filenames:
         fpath = os.path.join(ws_dir, fname)
         try:
-            size_bytes = os.path.getsize(fpath)
+            stat = os.stat(fpath)
+            size_bytes = stat.st_size
+            created_at = datetime.datetime.fromtimestamp(stat.st_ctime, datetime.UTC).isoformat()
+            modified_at = datetime.datetime.fromtimestamp(stat.st_mtime, datetime.UTC).isoformat()
+
             with open(fpath, "rb") as f:
                 content_bytes = f.read(512 * 1024)  # Read up to 512KB for inspection
             
@@ -182,13 +183,46 @@ def get_workspace_files():
                 "suspicious_process_exec": any("powershell" in s or "cmd.exe" in s or "spawn" in s or "createprocess" in s or "system(" in s for s in signals)
             }
 
+            # Gather CRUD operations history for this file from events table
+            file_ops = []
+            for ev in events:
+                if not isinstance(ev, dict):
+                    continue
+                c = ev.get("canonical") or {}
+                evt_fp = (c.get("file_path") or "").lower()
+                evt_fn = os.path.basename(evt_fp) if evt_fp else ""
+                if evt_fn.lower() == fname.lower() or fname.lower() in evt_fp:
+                    file_ops.append({
+                        "event_id": ev.get("id"),
+                        "action": (c.get("action") or ev.get("event_type") or "ACCESSED").upper(),
+                        "timestamp": ev.get("timestamp") or modified_at,
+                        "process": ev.get("process_name") or "fim_watcher",
+                        "threat_status": c.get("threat_status") or ("THREAT" if ev.get("is_suspicious") else "SAFE")
+                    })
+
+            if not file_ops:
+                file_ops.append({
+                    "event_id": f"init-{fname}",
+                    "action": "CREATED",
+                    "timestamp": created_at,
+                    "process": "filesystem",
+                    "threat_status": classification_res.threat_state
+                })
+
+            file_ops.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
+
+            is_safe = classification_res.threat_state in ["SAFE", "BENIGN"] and int(classification_res.risk_score) <= 30
+
             results.append({
                 "id": f"art-{sha256_hash[:8]}",
                 "file_name": fname,
                 "file_path": f"monitored_workspace/{fname}",
                 "size_bytes": size_bytes,
+                "created_at": created_at,
+                "modified_at": modified_at,
                 "sha256_hash": sha256_hash,
                 "threat_status": classification_res.threat_state,
+                "is_safe": is_safe,
                 "category": classification_res.classification,
                 "severity": classification_res.severity.upper(),
                 "confidence": int(classification_res.risk_score),
@@ -197,11 +231,14 @@ def get_workspace_files():
                 "evidence": [s.label for s in static_res.signals[:4]],
                 "content": content_text,
                 "defensive_indicators": defensive_indicators,
-                "event_type": "MODIFIED" if "ransom" in fname.lower() else "CREATED",
+                "crud_operations": file_ops,
+                "can_quarantine": True,
+                "can_delete": True,
+                "event_type": file_ops[0]["action"] if file_ops else "CREATED",
                 "process_name": "cmd.exe" if fname.endswith(".exe") else "powershell.exe" if fname.endswith(".ps1") else "php-fpm" if fname.endswith(".php") else "system",
                 "user": "NT AUTHORITY\\SYSTEM" if classification_res.threat_state == "THREAT" else "analyst"
             })
-        except Exception as e:
+        except Exception:
             continue
 
     return {"files": results, "total": len(results)}

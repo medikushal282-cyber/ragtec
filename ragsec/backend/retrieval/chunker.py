@@ -132,13 +132,13 @@ def chunk_json(doc: CanonicalDocument) -> List[CanonicalChunk]:
         return chunk_narrative(doc)
     return chunks
 
-def chunk_document(doc: CanonicalDocument) -> List[CanonicalChunk]:
-    """Format-aware parsing/chunking orchestrator."""
-    if doc.source_name.endswith('.csv') or doc.source_type == 'csv':
+def chunk_document(doc: CanonicalDocument, strategy: str = None) -> List[CanonicalChunk]:
+    """Format-aware and strategy-aware parsing/chunking orchestrator (IEEE Section VI-C)."""
+    if strategy == "IOC Table Rows" or doc.source_name.endswith('.csv') or doc.source_type in ['csv', 'ioc_table']:
         return chunk_ioc_csv(doc)
+    elif strategy == "Rule Blocks" or doc.source_name.endswith('.yml') or doc.source_name.endswith('.yar') or doc.source_type in ['rule', 'playbook']:
+        return chunk_rule_block(doc)
     elif doc.source_name.endswith('.json') or doc.source_type == 'json':
         return chunk_json(doc)
-    elif doc.source_name.endswith('.yml') or doc.source_name.endswith('.yar') or doc.source_type == 'rule':
-        return chunk_rule_block(doc)
     else:
         return chunk_narrative(doc)

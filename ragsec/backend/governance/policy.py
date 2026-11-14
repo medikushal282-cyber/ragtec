@@ -25,8 +25,8 @@ def evaluate_evidence_policy(
     thresholds = get_policy_thresholds(severity)
     theta_sim = thresholds["similarity"]
     theta_conf = thresholds["confidence"]
-    # Separate threshold for cross-encoder (logits typically range from -10 to 10; >0 is usually positive relevance)
-    theta_rerank = 0.0 if severity == IncidentSeverity.LOW else 1.0 if severity == IncidentSeverity.MEDIUM else 2.0 if severity == IncidentSeverity.HIGH else 3.0
+    # Calibrated threshold for ms-marco cross-encoder logits (-2.5 is ~10% probability, -1.0 is ~27%, 0.0 is 50%, >1.0 is >73%)
+    theta_rerank = -2.5 if severity == IncidentSeverity.LOW else -1.5 if severity == IncidentSeverity.MEDIUM else 0.0 if severity == IncidentSeverity.HIGH else 1.0
     
     if not evidence:
         return {

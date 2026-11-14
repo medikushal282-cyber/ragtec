@@ -212,7 +212,18 @@ class EventPipeline:
         conn.close()
         
         import json
-        events = [SecurityEvent(**json.loads(row['data'])) for row in rows]
+        events = []
+        for row in rows:
+            try:
+                data = json.loads(row['data'])
+                if isinstance(data, dict):
+                    if not data.get("network_id"):
+                        data["network_id"] = "net_workspace"
+                    if not data.get("device_id"):
+                        data["device_id"] = "dev_local"
+                    events.append(SecurityEvent(**data))
+            except Exception:
+                continue
         
         ioc_map = {}
         for e in events:

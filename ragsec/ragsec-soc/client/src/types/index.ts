@@ -1,11 +1,19 @@
 export type Page = 
   | "dashboard" 
-  | "autonomous_tester"
+  | "code_explorer"
+  | "file_scanner"
+  | "threat_lab"
+  | "ai_chat"
+  | "mitigation"
+  | "incident"
+  | "knowledge"
   | "test_reports"
-  | "knowledge" 
+  | "autonomous_tester"
+  | "governance_lab"
+  | "sps_benchmark"
+  | "siem_gateway"
   | "fleet" 
-  | "incident" 
-  | "mitigation";
+  | "active_threats";
 
 export interface BackendStatus {
   status: string;
@@ -28,10 +36,10 @@ export type ThreatCategory =
   | "BENIGN"
   | "UNKNOWN";
 
-export type ThreatStatus = "SAFE" | "SUSPICIOUS" | "THREAT" | "UNKNOWN";
+export type ThreatStatus = "SAFE" | "SUSPICIOUS" | "THREAT" | "UNKNOWN" | "QUARANTINED" | "BENIGN";
 export type ThreatSeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
-export type CRUDEventType = "CREATED" | "MODIFIED" | "DELETED" | "MOVED" | "PERM_CHANGE";
+export type CRUDEventType = "CREATED" | "MODIFIED" | "DELETED" | "MOVED" | "PERM_CHANGE" | "AI_ANALYSIS" | "SCAN" | "QUARANTINED";
 
 export interface FileCRUDEvent {
   id: string;

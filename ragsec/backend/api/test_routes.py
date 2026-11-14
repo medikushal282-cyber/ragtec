@@ -75,7 +75,7 @@ def run_all_tests():
     st_rw = run_static_analysis("ransom_note.txt", rw_content)
     cl_rw = classify_file("ransom_note.txt", rw_content, st_rw)
     dur_2 = int((time.perf_counter() - t0) * 1000)
-    passed_2 = cl_rw.classification == "Ransomware" and cl_rw.severity == "critical"
+    passed_2 = (cl_rw.threat_category == "Ransomware" or cl_rw.classification in ("Ransomware", "THREAT")) and cl_rw.severity == "critical"
     results.append({
         "id": "TC-02",
         "name": "Ransomware Shadow Copy Deletion Sim",

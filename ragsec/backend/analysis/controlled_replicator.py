@@ -13,11 +13,10 @@ import threading
 import datetime
 from typing import Dict, List, Any, Optional
 
+from config import get_canonical_workspace_dir
+
 def get_workspace_dir() -> str:
-    return os.environ.get(
-        "RAGSEC_MONITORED_DIR",
-        os.path.abspath(os.path.join(os.getcwd(), "..", "..", "monitored_workspace"))
-    )
+    return get_canonical_workspace_dir()
 
 def get_sandbox_dir() -> str:
     ws = get_workspace_dir()

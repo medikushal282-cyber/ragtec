@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any
 from analysis.static_analyzer import run_static_analysis
 from analysis.file_classifier import classify_file
 from db.database import save_file_analysis, get_file_analysis, list_file_analyses
+from config import settings
 
 router = APIRouter(prefix="/api/analysis", tags=["file_analysis"])
 
@@ -212,7 +213,8 @@ pgrep -f "{fname}" && echo "WARNING: Process still alive" || echo "CLEAN: Threat
 
 
 class ChatMitigationRequest(BaseModel):
-    message: str
+    message: Optional[str] = None
+    query: Optional[str] = None
     conversation_history: Optional[List[Dict[str, str]]] = None
     threat_category: Optional[str] = "Ransomware"
     file_name: Optional[str] = None
@@ -225,6 +227,7 @@ class ChatMitigationRequest(BaseModel):
 
 
 @router.post("/chat-mitigation")
+@router.post("/chat")
 def chat_mitigation(req: ChatMitigationRequest):
     """
     Conversational Threat Mitigation Chatbot.
@@ -246,15 +249,32 @@ def chat_mitigation(req: ChatMitigationRequest):
     retriever = Retriever(vector_store=vstore, embedder=emb)
     gen = Generator()
 
-    # 1. Retrieve matching playbooks from ChromaDB
-    search_q = f"mitigation containment playbook for {req.threat_category or ''} {req.file_name or ''} {req.message}"
-    evidence_docs = retriever.retrieve(query=search_q, top_n=3)
+    msg_text = req.message or req.query or "Analyze threat and recommend containment."
+    msg_clean = msg_text.lower().strip()
+    is_greeting = msg_clean in ["hello", "hi", "hey", "help", "who are you", "what can you do", "status", "greetings"]
 
-    evidence_str = "\n".join([f"[{d.get('source', 'CTI')}] {d.get('chunk_text', '')}" for d in evidence_docs])
+    # 1. Retrieve matching playbooks from ChromaDB only if not a simple greeting
+    evidence_docs = []
+    if not is_greeting:
+        search_q = f"mitigation containment playbook for {req.threat_category or ''} {req.file_name or ''} {msg_text}"
+        try:
+            evidence_docs = retriever.retrieve(query=search_q, top_n=3)
+        except Exception:
+            evidence_docs = []
+
+    evidence_str = "\n".join([f"[{d.get('source', 'CTI')}] {d.get('chunk_text', '')}" for d in evidence_docs]) if evidence_docs else "No specific prior playbooks retrieved."
 
     # 2. Build system prompt and context
-    system_prompt = f"""You are RAGSec Threat Mitigation Copilot, an elite incident response and SOC automation assistant.
+    if is_greeting:
+        system_prompt = f"""You are RAGSec Threat Mitigation Copilot, an intelligent, conversational SOC defensive partner.
+The analyst just greeted you. 
+Respond naturally, conversationally, and warmly like a modern AI chatbot.
+Acknowledge the target endpoint ({req.target_host or 'Local Endpoint'}), and ask how you can assist with their incident investigation, process inspection, or containment planning.
+DO NOT dump unsolicited scripts or markdown tables for a simple greeting."""
+    else:
+        system_prompt = f"""You are RAGSec Threat Mitigation Copilot, an elite incident response and SOC automation assistant.
 You specialize in rapid containment, malware eradication, host isolation, and digital forensics.
+Talk conversationally and authoritatively like an AI cybersecurity partner.
 
 Current Incident Context:
 - Target Threat: {req.threat_category or 'General Threat'}
@@ -266,30 +286,44 @@ Retrieved Threat Intelligence & Playbooks:
 {evidence_str}
 
 Instructions:
-1. Provide concise, expert, and actionable advice.
-2. When asked for code or scripts, provide ready-to-execute PowerShell, Bash, or Firewall netsh commands formatted in markdown codeblocks with clear step explanations.
-3. Reference containment best practices (isolate first, kill processes, quarantine files, block C2 communication, verify integrity).
-4. Be clear, direct, and professional."""
+1. Provide concise, expert, and actionable advice tailored directly to the analyst's question.
+2. If the user asks for code, provide clean executable PowerShell, Bash, or netsh commands in markdown codeblocks with clear step explanations.
+3. DO NOT output massive generic boilerplate tables unless specifically asked for a structured comparison matrix.
+4. Be clear, direct, and conversational."""
 
     # Format message history
     formatted_messages = []
     if req.conversation_history:
         for m in req.conversation_history[-6:]:  # past 6 turns
             formatted_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
-    formatted_messages.append({"role": "user", "content": req.message})
+    formatted_messages.append({"role": "user", "content": msg_text})
+
+    # Generate via Generator
+    groq_key = req.api_key or settings.GROQ_API_KEY
+    chosen_provider = "groq" if (groq_key and "gsk_" in groq_key) else (req.provider or "groq")
+    chosen_model = req.model or "openai/gpt-oss-120b"
 
     res = gen.generate(
-        prompt=req.message,
-        provider=req.provider,
-        model=req.model,
-        api_key=req.api_key,
+        prompt=msg_text,
+        provider=chosen_provider,
+        model=chosen_model,
+        api_key=groq_key,
         base_url=req.base_url,
         system_prompt=system_prompt,
         messages=formatted_messages
     )
 
+    reply_text = res.get("answer", "")
+    if is_greeting or not reply_text or "no matching telemetry" in reply_text.lower():
+        if is_greeting:
+            reply_text = (
+                f"Hello Analyst! I am your RAGSec Threat Mitigation Copilot for `{req.target_host or 'Local Endpoint'}`. "
+                f"I am ready to help you investigate alerts, inspect running processes, formulate PowerShell/Bash containment scripts, or stage mitigation playbooks.\n\n"
+                f"How can I assist your investigation today?"
+            )
+
     return {
-        "reply": res.get("answer", "No response generated."),
+        "reply": reply_text or "Hello! How can I assist with your security triage today?",
         "provider": res.get("provider", req.provider or "Local"),
         "model": res.get("model", req.model or "default"),
         "evidence_citations": [d.get("source", "CTI") for d in evidence_docs],
@@ -314,14 +348,15 @@ def list_recent_analyses(limit: int = 20):
 
 class GroqWorkspaceScanRequest(BaseModel):
     api_key: Optional[str] = None
-    model: Optional[str] = "llama-3.3-70b-versatile"
+    model: Optional[str] = "openai/gpt-oss-120b"
     workspace_dir: Optional[str] = None
     use_tools: bool = True
+    provider: Optional[str] = "builtin"
 
 @router.post("/scan-workspace-groq")
 def scan_workspace_with_groq(req: GroqWorkspaceScanRequest):
     """
-    Executes deep threat detection on all files in the space using Groq LLMs + tool calling.
+    Executes deep threat detection on all files in the space using AI agent / grounded engine.
     Declares if each file is UNSAFE (threat) or SAFE, with severity, risk score, and playbooks.
     """
     from analysis.groq_threat_agent import scan_workspace_with_groq_agent
@@ -329,7 +364,8 @@ def scan_workspace_with_groq(req: GroqWorkspaceScanRequest):
         workspace_dir=req.workspace_dir,
         api_key=req.api_key,
         model=req.model,
-        use_tools=req.use_tools
+        use_tools=req.use_tools,
+        provider=req.provider
     )
     return res
 
@@ -337,20 +373,22 @@ def scan_workspace_with_groq(req: GroqWorkspaceScanRequest):
 class GroqFileAnalysisRequest(BaseModel):
     file_path: str
     api_key: Optional[str] = None
-    model: Optional[str] = "llama-3.3-70b-versatile"
+    model: Optional[str] = "openai/gpt-oss-120b"
     use_tools: bool = True
+    provider: Optional[str] = "builtin"
 
 @router.post("/analyze-file-groq")
 def analyze_single_file_with_groq_endpoint(req: GroqFileAnalysisRequest):
     """
-    Analyzes an individual file using the Groq AI Threat Agent with tools.
+    Analyzes an individual file using the AI Threat Agent with tools.
     """
     from analysis.groq_threat_agent import analyze_single_file_with_groq
     res = analyze_single_file_with_groq(
         filepath=req.file_path,
         api_key=req.api_key,
         model=req.model,
-        use_tools=req.use_tools
+        use_tools=req.use_tools,
+        provider=req.provider
     )
     return res
 

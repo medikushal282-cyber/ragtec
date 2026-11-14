@@ -43,6 +43,21 @@ def discover_models(req: ModelDiscoveryRequest):
     return result
 
 
+@router.get("/discover")
+def discover_models_get(
+    provider: str = "groq",
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None
+):
+    """GET handler for model discovery with query parameters."""
+    return discover_models_for_provider(
+        provider=provider,
+        api_key=api_key,
+        base_url=base_url
+    )
+
+
+
 @router.get("/local-status")
 def get_local_engines_status():
     """
@@ -62,8 +77,8 @@ def list_supported_providers():
                 "id": "groq",
                 "name": "Groq Cloud API",
                 "type": "cloud",
-                "description": "Ultra-low latency inference (Llama 3.3 70B, Mixtral, DeepSeek Distill)",
-                "default_model": "llama-3.3-70b-versatile",
+                "description": "Ultra-low latency inference (GPT-OSS 120B, GPT-OSS 20B, Safeguard 20B, Qwen 3.8)",
+                "default_model": "openai/gpt-oss-120b",
                 "requires_api_key": True,
                 "key_prefix": "gsk_"
             },
@@ -105,3 +120,132 @@ def list_supported_providers():
             }
         ]
     }
+
+
+# Global in-memory Active Brain state
+_ACTIVE_BRAIN_STATE: Dict[str, Any] = {
+    "model": "openai/gpt-oss-120b",
+    "provider": "groq",
+    "name": "GPT-OSS 120B Flagship (Groq LPU)",
+    "tier_name": "Flagship Reasoning",
+    "badge": "120B Flagship",
+    "context_window": 131072,
+    "category": "Flagship Reasoning",
+    "description": "Groq Flagship 120B parameter reasoning model with 131k context. Top-tier multi-stage cybersecurity threat correlation, reverse engineering, and mitigation playbooks."
+}
+
+
+@router.get("/groq-top-tier")
+def get_groq_top_tier_models():
+    """
+    Returns curated top-tier models verified on Groq API suited for cybersecurity tasks.
+    """
+    from generation.model_discovery import GROQ_CURATED_MODELS
+    return {
+        "status": "success",
+        "provider": "groq",
+        "models": GROQ_CURATED_MODELS,
+        "default_model": "openai/gpt-oss-120b"
+    }
+
+
+class ActiveBrainPayload(BaseModel):
+    model: str
+    provider: Optional[str] = "groq"
+    api_key: Optional[str] = None
+
+
+@router.get("/active-brain")
+def get_active_brain():
+    """
+    Returns the currently active AI Brain for the entire platform.
+    """
+    return {
+        "active_brain": _ACTIVE_BRAIN_STATE,
+        "status": "active"
+    }
+
+
+@router.post("/active-brain")
+def set_active_brain(payload: ActiveBrainPayload):
+    """
+    Updates the globally active AI Brain across all SOC scanners, copilots, and helpers.
+    """
+    from generation.model_discovery import GROQ_CURATED_MODELS
+    matched = next((m for m in GROQ_CURATED_MODELS if m["id"] == payload.model), None)
+    
+    _ACTIVE_BRAIN_STATE["model"] = payload.model
+    _ACTIVE_BRAIN_STATE["provider"] = payload.provider or "groq"
+    if matched:
+        _ACTIVE_BRAIN_STATE["name"] = matched.get("name", payload.model)
+        _ACTIVE_BRAIN_STATE["tier_name"] = matched.get("category", "Selected Groq Model")
+        _ACTIVE_BRAIN_STATE["badge"] = matched.get("badge", "Groq AI")
+        _ACTIVE_BRAIN_STATE["context_window"] = matched.get("context_window", 128000)
+        _ACTIVE_BRAIN_STATE["description"] = matched.get("description", "")
+    else:
+        _ACTIVE_BRAIN_STATE["name"] = payload.model
+        _ACTIVE_BRAIN_STATE["tier_name"] = "Custom Model"
+        _ACTIVE_BRAIN_STATE["badge"] = "Custom"
+
+    return {
+        "status": "updated",
+        "active_brain": _ACTIVE_BRAIN_STATE
+    }
+
+
+class TestKeyPayload(BaseModel):
+    api_key: str
+    model: Optional[str] = "openai/gpt-oss-120b"
+
+
+@router.post("/test-groq-key")
+def test_groq_key(payload: TestKeyPayload):
+    """
+    Tests live Groq API key connectivity, measures ping latency, and lists active models.
+    """
+    import time
+    import requests
+    key = payload.api_key.strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Groq API key cannot be empty.")
+    
+    if not key.startswith("gsk_"):
+        return {
+            "valid": False,
+            "connected": False,
+            "latency_ms": 0,
+            "error": "Invalid format: Groq API keys must begin with 'gsk_'."
+        }
+
+    start = time.time()
+    try:
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        resp = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5.0)
+        latency = round((time.time() - start) * 1000)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            models_list = [m.get("id") for m in data.get("data", []) if m.get("active", True)]
+            return {
+                "valid": True,
+                "connected": True,
+                "latency_ms": latency,
+                "message": f"Groq LPU Connected! ({latency}ms latency)",
+                "active_models_count": len(models_list),
+                "model_available": payload.model in models_list
+            }
+        else:
+            return {
+                "valid": False,
+                "connected": False,
+                "latency_ms": latency,
+                "error": f"Groq API returned HTTP {resp.status_code}: {resp.text[:120]}"
+            }
+    except Exception as e:
+        return {
+            "valid": False,
+            "connected": False,
+            "latency_ms": 0,
+            "error": f"Connection timed out or failed: {e}"
+        }
+

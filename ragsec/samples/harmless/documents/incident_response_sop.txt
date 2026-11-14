@@ -1,0 +1,14 @@
+# RAGSec Standard Security Operations Procedure (SOP-SEC-01)
+# Document Classification: INTERNAL USE ONLY
+
+1. Scope:
+This SOP outlines the daily verification checks performed by Tier 1 SOC analysts across monitored workspace nodes.
+
+2. Daily Ingestion Checks:
+- Verify File Integrity Monitoring (FIM) daemon is healthy on port 8000.
+- Confirm SQLite audit ledger SHA-256 chain has valid consecutive integrity links.
+- Review unassigned incidents in the Incident Triage queue.
+
+3. Escalation Pathways:
+- High/Critical incidents: Require Human-In-The-Loop approval before containment playbooks are executed.
+- Benign suppressions: Must cite suppression rationale in the whitelist ledger.

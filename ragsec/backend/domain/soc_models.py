@@ -19,12 +19,14 @@ class ThreatCategory(str, Enum):
     DATA_EXFILTRATION = "Data Exfiltration"
     C2 = "Command and Control (C2)"
     INSIDER_THREAT = "Insider Threat"
+    VULNERABLE_CODE = "Vulnerable Code"
     BENIGN = "Benign"
     UNKNOWN = "Unknown"
 
 class ClassificationState(str, Enum):
     BENIGN = "BENIGN"
     THREAT = "THREAT"
+    VULNERABLE = "VULNERABLE"
     UNKNOWN = "UNKNOWN"
 
 class MitigationStatus(str, Enum):
@@ -90,11 +92,11 @@ class CanonicalFields(BaseModel):
 class SecurityEvent(BaseModel):
     id: str
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
-    network_id: str
-    device_id: str
-    source_type: str
-    event_type: str
-    raw_message: str
+    network_id: Optional[str] = "net_workspace"
+    device_id: Optional[str] = "dev_local"
+    source_type: str = "FIM"
+    event_type: str = "security_event"
+    raw_message: str = ""
 
     # Provenance & normalization
     provenance: Optional[ProvenanceMetadata] = None

@@ -235,22 +235,35 @@ class StaticAnalysisResult:
     error: Optional[str] = None
 
 
-def compute_sha256(content: bytes) -> str:
+def compute_sha256(content: Any) -> str:
+    if isinstance(content, str):
+        content = content.encode("utf-8", errors="ignore")
     return hashlib.sha256(content).hexdigest()
 
 
-def _is_text(content: bytes) -> bool:
+def _is_text(content: Any) -> bool:
     """Heuristic: if <10% non-printable non-whitespace bytes → treat as text."""
+    if isinstance(content, str):
+        content = content.encode("utf-8", errors="ignore")
     sample = content[:4096]
     non_text = sum(1 for b in sample if b < 0x09 or (0x0e <= b <= 0x1f) or b == 0x7f)
     return non_text / max(len(sample), 1) < 0.1
 
 
-def run_static_analysis(filename: str, content: bytes) -> StaticAnalysisResult:
+def run_static_analysis(filename: str, content: Any = None) -> StaticAnalysisResult:
     """
     Performs deterministic static analysis on file content.
     NEVER executes the file or any subprocess.
     """
+    # Handle swapped arguments gracefully if called as (content, filename)
+    if isinstance(filename, bytes) or (isinstance(filename, str) and content is not None and len(filename) > len(str(content)) and ("\n" in filename or "import " in filename or "def " in filename)):
+        filename, content = str(content), filename
+
+    if content is None:
+        content = b""
+    elif isinstance(content, str):
+        content = content.encode("utf-8", errors="ignore")
+
     sha = compute_sha256(content)
     ext = os.path.splitext(filename)[1].lower()
     size = len(content)

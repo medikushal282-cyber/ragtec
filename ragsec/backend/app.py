@@ -20,6 +20,7 @@ from api.threat_lab_routes import router as threat_lab_router
 from api.step_helper_routes import router as step_helper_router
 from api.process_routes import router as process_router
 from api.fleet_routes import router as fleet_router
+from api.knowledge_routes import router as knowledge_router
 from analysis.active_threat_detector import active_threat_detector
 from config import settings, get_canonical_workspace_dir
 
@@ -77,6 +78,7 @@ app.include_router(threat_lab_router)
 app.include_router(step_helper_router)
 app.include_router(process_router)
 app.include_router(fleet_router)
+app.include_router(knowledge_router)
 
 @app.get("/")
 def root_status():

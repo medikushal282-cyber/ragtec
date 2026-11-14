@@ -188,6 +188,21 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
     });
   };
 
+  // File & Process Threat RAG Matching toggle (DEFAULT SWITCHED ON)
+  const [fileRAGEnabled, setFileRAGEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem("ragsec_file_rag_enabled");
+    return saved !== null ? saved === "true" : true; // DEFAULT ON
+  });
+
+  const toggleFileRAG = () => {
+    setFileRAGEnabled(prev => {
+      const next = !prev;
+      localStorage.setItem("ragsec_file_rag_enabled", String(next));
+      toast.success(next ? "File & Process Threat RAG Matching is ACTIVE (Default)" : "File & Process Threat RAG Matching paused");
+      return next;
+    });
+  };
+
   // Target host context & custom targets
   const [customTargets, setCustomTargets] = useState<string[]>(() => {
     try {
@@ -1110,6 +1125,23 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
               </span>
             </button>
 
+            {/* File & Process Threat RAG Matching Toggle (DEFAULT ON) */}
+            <button
+              onClick={toggleFileRAG}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 apple-button transition-all whitespace-nowrap flex-shrink-0 ${
+                fileRAGEnabled 
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-950/50" 
+                  : "bg-white/[0.04] border-white/[0.08] text-[#8E8E93] hover:text-white"
+              }`}
+              title="Toggle Realtime Workspace File & Process Threat RAG Matching (Default: ON)"
+            >
+              <Cpu className={`w-3.5 h-3.5 flex-shrink-0 ${fileRAGEnabled ? "text-emerald-400" : ""}`} />
+              <span className="hidden sm:inline whitespace-nowrap">File RAG Match</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold flex-shrink-0 ${fileRAGEnabled ? "bg-emerald-500/20 text-emerald-200" : "bg-white/10 text-slate-400"}`}>
+                {fileRAGEnabled ? "ON" : "OFF"}
+              </span>
+            </button>
+
             {/* Online Intelligence Toggle */}
             <button
               onClick={toggleSearchOnline}
@@ -1118,7 +1150,7 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
                   ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-sm shadow-cyan-950/50" 
                   : "bg-white/[0.04] border-white/[0.08] text-[#8E8E93] hover:text-white"
               }`}
-              title="Toggle Live Online MITRE / NVD Intelligence Retrieval"
+              title="Toggle Live Online MITRE / NVD Intelligence Retrieval (Default: OFF)"
             >
               <Globe className={`w-3.5 h-3.5 flex-shrink-0 ${searchOnline ? "text-cyan-400 animate-spin" : ""}`} />
               <span className="hidden sm:inline whitespace-nowrap">Online Intel</span>
@@ -1489,7 +1521,21 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
               {/* Bottom bar inside textarea */}
               <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between pointer-events-none">
                 <div className="flex items-center gap-2 pointer-events-auto">
-                  {/* Online Search Toggle Pill */}
+                  {/* File RAG Match Toggle Pill (DEFAULT ON) */}
+                  <button
+                    onClick={toggleFileRAG}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-semibold flex items-center gap-1 transition-all apple-button ${
+                      fileRAGEnabled 
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" 
+                        : "bg-white/[0.04] text-[#8E8E93] hover:text-white border border-white/[0.06]"
+                    }`}
+                    title="Toggle Workspace File & Process Threat RAG Matching (Default: ON)"
+                  >
+                    <Cpu className="w-3 h-3 text-emerald-400" />
+                    <span>File RAG: {fileRAGEnabled ? "ON" : "OFF"}</span>
+                  </button>
+
+                  {/* Online Search Toggle Pill (DEFAULT OFF) */}
                   <button
                     onClick={toggleSearchOnline}
                     className={`px-2 py-1 rounded-lg text-[10px] font-mono font-semibold flex items-center gap-1 transition-all apple-button ${
@@ -1497,10 +1543,10 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
                         ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40" 
                         : "bg-white/[0.04] text-[#8E8E93] hover:text-white border border-white/[0.06]"
                     }`}
-                    title="Toggle Live Online MITRE / NVD Search"
+                    title="Toggle Live Online MITRE / NVD Search (Default: OFF)"
                   >
                     <Globe className="w-3 h-3" />
-                    <span>Online CTI</span>
+                    <span>Online CTI: {searchOnline ? "ON" : "OFF"}</span>
                   </button>
 
                   {/* Target Host Pill */}

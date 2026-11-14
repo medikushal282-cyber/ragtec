@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ExternalLink
 } from "lucide-react";
+import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -278,9 +279,20 @@ export const IncidentTriageView: React.FC<IncidentTriageViewProps> = ({ onNaviga
                 <p>Select an incident from the queue and click <strong>"Triage"</strong> to synthesize CTI guidance.</p>
               </div>
             ) : isInvestigating ? (
-              <div className="py-16 text-center text-cyan-400 space-y-3">
-                <RefreshCw className="w-8 h-8 animate-spin mx-auto text-cyan-400" />
-                <p className="font-bold">Querying vector store, reranking CTI evidence, and validating CRC citations...</p>
+              <div className="py-8 space-y-3">
+                <RealtimeETAProgressBar
+                  title="RAG Grounded Incident Deep Triage"
+                  subtitle={`Querying vector embeddings & reranking CTI citations for ${selectedIncident?.title}...`}
+                  isActive={isInvestigating}
+                  estimatedDurationMs={2800}
+                  accentColor="blue"
+                  stages={[
+                    { label: "Stage 1/4: Semantic Vector Retrieval & CTI Chunk Embedding", targetPercent: 0 },
+                    { label: "Stage 2/4: Cross-Encoder Re-Ranking & Citation Hallucination Check (CRC)", targetPercent: 30 },
+                    { label: "Stage 3/4: Context-Aware LLM Inference & Confidence Calibration", targetPercent: 65 },
+                    { label: "Stage 4/4: Synthesizing Proportional Containment & Mitigation Playbook", targetPercent: 88 }
+                  ]}
+                />
               </div>
             ) : (
               <div className="space-y-4">

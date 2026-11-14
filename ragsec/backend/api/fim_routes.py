@@ -104,6 +104,60 @@ def get_fim_events():
             deduped.append(e)
         elif len(deduped) < 80:
             deduped.append(e)
+
+    # 3. Synchronize status with actual filesystem & quarantine enclave
+    workspace_dir = get_workspace_dir()
+    quarantine_dir = os.path.join(workspace_dir, ".quarantine")
+    quarantined_map = {}
+    if os.path.exists(quarantine_dir):
+        import re
+        for qf in os.listdir(quarantine_dir):
+            full_qp = os.path.join(quarantine_dir, qf)
+            if os.path.isfile(full_qp):
+                clean_name = re.sub(r'\.\d{8}_\d{6}\.quarantined$', '', qf)
+                clean_name = re.sub(r'\.quarantined$', '', clean_name)
+                quarantined_map[clean_name.lower()] = qf
+                quarantined_map[qf.lower()] = qf
+
+    for e in deduped:
+        c = e.get("canonical") or {}
+        fp = c.get("file_path") or ""
+        fn = os.path.basename(fp) if fp else ""
+        if not fn and e.get("raw_message"):
+            parts = e.get("raw_message").split()
+            if parts:
+                fn = parts[-1]
+        fn_lower = fn.lower()
+
+        # Check physical presence on disk in monitored_workspace
+        on_disk = False
+        if fn:
+            disk_p = os.path.join(workspace_dir, fn)
+            on_disk = os.path.exists(disk_p) and os.path.isfile(disk_p)
+
+        # Check quarantine status
+        if fn_lower in quarantined_map or e.get("status") == "QUARANTINED" or c.get("is_quarantined"):
+            q_file = quarantined_map.get(fn_lower, fn)
+            e["status"] = "QUARANTINED"
+            e["is_quarantined"] = True
+            e["quarantined_artifact"] = q_file
+            if isinstance(e.get("canonical"), dict):
+                e["canonical"]["threat_status"] = "QUARANTINED"
+                e["canonical"]["file_path"] = f"monitored_workspace/.quarantine/{q_file}"
+                e["canonical"]["is_quarantined"] = True
+            if isinstance(e.get("threat_analysis"), dict):
+                e["threat_analysis"]["is_threat"] = False
+                e["threat_analysis"]["threat_state"] = "QUARANTINED"
+                e["threat_analysis"]["classification"] = "Contained in Enclave"
+        elif not on_disk and fn:
+            # File was removed / cleaned up
+            e["status"] = "RESOLVED"
+            e["is_deleted"] = True
+            if isinstance(e.get("canonical"), dict):
+                e["canonical"]["threat_status"] = "RESOLVED"
+            if isinstance(e.get("threat_analysis"), dict):
+                e["threat_analysis"]["is_threat"] = False
+                e["threat_analysis"]["threat_state"] = "RESOLVED"
             
     return deduped[:80]
 

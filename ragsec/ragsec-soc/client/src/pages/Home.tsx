@@ -66,6 +66,7 @@ import { AICopilotChatView } from "../components/AICopilotChatView";
 import { OperatorProfileModal, UserProfile, DEFAULT_OPERATORS } from "../components/OperatorProfileModal";
 import { FloatingPearlescentNotification, FleetThreatNotificationItem } from "../components/FloatingPearlescentNotification";
 import { RemoteSandboxExplorerModal } from "../components/RemoteSandboxExplorerModal";
+import { RealtimeETAProgressBar } from "../components/RealtimeETAProgressBar";
 import type { DemoScenarioArtifact } from "../services/demoEngine";
 import { FileCRUDEvent, ThreatCategory } from "../types";
 
@@ -149,7 +150,7 @@ export default function Home() {
   const [threatNotification, setThreatNotification] = useState<FileCRUDEvent | null>(null);
 
   const threatEventsCount = crudEvents.filter(
-    (e) => e.threat_status === "THREAT" || e.threat_status === "SUSPICIOUS"
+    (e) => (e.threat_status === "THREAT" || e.threat_status === "SUSPICIOUS") && !e.quarantined && e.threat_status !== "QUARANTINED" && e.threat_status !== "RESOLVED"
   ).length;
   const benignEventsCount = crudEvents.filter(
     (e) => e.threat_status !== "THREAT" && e.threat_status !== "SUSPICIOUS" && e.event_type !== "AI_ANALYSIS"
@@ -160,7 +161,7 @@ export default function Home() {
 
   const filteredCrudEvents = crudEvents.filter((evt) => {
     if (fimFilter === "THREATS") {
-      return evt.threat_status === "THREAT" || evt.threat_status === "SUSPICIOUS";
+      return (evt.threat_status === "THREAT" || evt.threat_status === "SUSPICIOUS") && !evt.quarantined && evt.threat_status !== "QUARANTINED" && evt.threat_status !== "RESOLVED";
     }
     if (fimFilter === "BENIGN") {
       return evt.threat_status !== "THREAT" && evt.threat_status !== "SUSPICIOUS" && evt.event_type !== "AI_ANALYSIS";
@@ -347,7 +348,13 @@ export default function Home() {
     setIsScanningWorkspace(true);
     toast.loading("Scanning workspace directory...", { id: "scan-toast" });
     try {
+      const startTime = Date.now();
       const res = await fetch(`${API_BASE_URL}/api/fim/scan`, { method: "POST" });
+      const minDisplayMs = 2800; // Allow real-time ETA bar to animate through stages
+      const elapsed = Date.now() - startTime;
+      if (elapsed < minDisplayMs) {
+        await new Promise(r => setTimeout(r, minDisplayMs - elapsed));
+      }
       if (res.ok) {
         const data = await res.json();
         toast.success(`Scan complete: ${data.files_scanned || 0} files inspected, ${data.threats_flagged || 0} threats detected.`, { id: "scan-toast" });
@@ -910,6 +917,24 @@ export default function Home() {
                       </div>
                     </div>
 
+                    {/* Live Real-time ETA Progress Bar (When Scanning Workspace) */}
+                    {isScanningWorkspace && (
+                      <RealtimeETAProgressBar
+                        title="FIM Workspace Directory Scan"
+                        subtitle="Inspecting files in monitored_workspace/ with continuous behavioral verification"
+                        isActive={isScanningWorkspace}
+                        variant="panel"
+                        estimatedDurationMs={3200}
+                        accentColor="blue"
+                        stages={[
+                          { label: "Stage 1/4: Enumerating Files & Walking Sandbox Hierarchy", targetPercent: 0 },
+                          { label: "Stage 2/4: Computing SHA-256 Hashes & Shannon Entropy", targetPercent: 30 },
+                          { label: "Stage 3/4: Grounded SAST AST Matching & Groq LPU Triage", targetPercent: 65 },
+                          { label: "Stage 4/4: Synchronizing SQLite FIM Database & Threat Posture", targetPercent: 88 }
+                        ]}
+                      />
+                    )}
+
                     {/* Stat Metrics Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {/* Active Threats Card */}
@@ -1096,7 +1121,9 @@ export default function Home() {
                           </div>
                         ) : (
                           filteredCrudEvents.map((evt) => {
-                            const isThreat = evt.threat_status === "THREAT" || evt.threat_status === "SUSPICIOUS";
+                            const isQuarantined = evt.threat_status === "QUARANTINED" || evt.quarantined === true || evt.file_path.includes(".quarantine");
+                            const isResolved = evt.threat_status === "RESOLVED";
+                            const isThreat = !isQuarantined && !isResolved && (evt.threat_status === "THREAT" || evt.threat_status === "SUSPICIOUS");
                             const isExpanded = expandedFimId === evt.id;
                             const isCode = evt.file_name.endsWith(".py") || evt.file_name.endsWith(".exe") || evt.file_name.endsWith(".ps1") || evt.file_name.endsWith(".bat");
                             const isDoc = evt.file_name.endsWith(".txt") || evt.file_name.endsWith(".md") || evt.file_name.endsWith(".json");
@@ -1110,6 +1137,8 @@ export default function Home() {
                                 className={`rounded-xl border transition-all ${
                                   isThreat
                                     ? "bg-red-500/[0.04] border-red-500/20 hover:border-red-500/40"
+                                    : isQuarantined
+                                    ? "bg-purple-500/[0.04] border-purple-500/25 hover:border-purple-500/40"
                                     : "bg-white/[0.015] border-white/[0.04] hover:border-white/[0.08]"
                                 }`}
                               >
@@ -1120,9 +1149,13 @@ export default function Home() {
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                                       isThreat 
                                         ? "bg-red-500/15 text-red-400 border border-red-500/25" 
+                                        : isQuarantined
+                                        ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
                                         : "bg-white/[0.04] text-slate-400 border border-white/[0.06]"
                                     }`}>
-                                      {isCode ? (
+                                      {isQuarantined ? (
+                                        <Lock className="w-4 h-4 text-purple-400" />
+                                      ) : isCode ? (
                                         <FileCode2 className="w-4 h-4" />
                                       ) : isDoc ? (
                                         <FileText className="w-4 h-4" />
@@ -1134,7 +1167,9 @@ export default function Home() {
                                     {/* Content Info */}
                                     <div className="min-w-0 flex-1 space-y-0.5">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`font-semibold text-xs truncate ${isThreat ? "text-red-200 font-mono" : "text-white"}`}>
+                                        <span className={`font-semibold text-xs truncate ${
+                                          isThreat ? "text-red-200 font-mono" : isQuarantined ? "text-purple-200 font-mono" : "text-white"
+                                        }`}>
                                           {evt.file_name}
                                         </span>
                                         <span className="text-[10px] text-[#636366] font-mono">
@@ -1147,7 +1182,7 @@ export default function Home() {
                                       {/* Reason / Trigger - Soft Muted Typography */}
                                       {evt.reasons && evt.reasons.length > 0 && (
                                         <p className="text-[11px] text-slate-300 line-clamp-1">
-                                          {evt.reasons[0]}
+                                          {isQuarantined ? `Isolated in .quarantine enclave: ${evt.reasons[0]}` : evt.reasons[0]}
                                         </p>
                                       )}
                                     </div>
@@ -1158,11 +1193,16 @@ export default function Home() {
                                     <div className={`px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide border flex items-center gap-1.5 ${
                                       isThreat
                                         ? "bg-red-500/15 text-red-300 border-red-500/30"
+                                        : isQuarantined
+                                        ? "bg-purple-500/20 text-purple-300 border-purple-500/35"
+                                        : isResolved
+                                        ? "bg-slate-500/15 text-slate-400 border-white/[0.08]"
                                         : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                     }`}>
                                       {isThreat && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>}
-                                      <span>{isThreat ? (evt.category || "THREAT") : "VERIFIED SAFE"}</span>
-                                      <span className="text-[9px] opacity-70 font-mono">({evt.confidence || 95}%)</span>
+                                      {isQuarantined && <ShieldCheck className="w-3 h-3 text-purple-400" />}
+                                      <span>{isThreat ? (evt.category || "THREAT") : isQuarantined ? "CONTAINED IN ENCLAVE" : isResolved ? "RESOLVED / REMOVED" : "VERIFIED SAFE"}</span>
+                                      {!isResolved && <span className="text-[9px] opacity-70 font-mono">({evt.confidence || 95}%)</span>}
                                     </div>
 
                                     {isThreat ? (
@@ -1185,6 +1225,23 @@ export default function Home() {
                                         <Zap className="w-3 h-3" />
                                         <span>Mitigate</span>
                                       </button>
+                                    ) : isQuarantined ? (
+                                      <button
+                                        onClick={() => {
+                                          setCurrentPage("scanner");
+                                          toast.info(`Opening Quarantine Enclave for ${evt.file_name}`);
+                                        }}
+                                        className="px-3 py-1.2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-1 apple-button shadow-sm"
+                                        title="Open in Quarantine Vault"
+                                      >
+                                        <Lock className="w-3 h-3 text-purple-400" />
+                                        <span>Quarantine Vault</span>
+                                      </button>
+                                    ) : isResolved ? (
+                                      <div className="px-2.5 py-1 text-[11px] text-[#8E8E93] font-mono flex items-center gap-1">
+                                        <Check className="w-3 h-3 text-emerald-400" />
+                                        <span>Cleaned</span>
+                                      </div>
                                     ) : (
                                       <button
                                         onClick={() => {
@@ -1430,6 +1487,22 @@ export default function Home() {
         onUpdateUser={handleUpdateUser}
         operators={operators}
         onAddOperator={handleAddOperator}
+      />
+
+      {/* Floating Realtime ETA Progress Bar for Global Workspace Scan */}
+      <RealtimeETAProgressBar
+        title="Enterprise FIM Workspace Directory Scan"
+        subtitle="Scanning monitored_workspace/ for uncommitted payloads, rogue binaries, and high-entropy anomalies"
+        isActive={isScanningWorkspace}
+        variant="floating"
+        estimatedDurationMs={3200}
+        accentColor="blue"
+        stages={[
+          { label: "Stage 1/4: Enumerating Files & Walking Sandbox Hierarchy", targetPercent: 0 },
+          { label: "Stage 2/4: Computing SHA-256 Hashes & Shannon Entropy", targetPercent: 30 },
+          { label: "Stage 3/4: Grounded SAST AST Matching & Groq LPU Triage", targetPercent: 65 },
+          { label: "Stage 4/4: Synchronizing SQLite FIM Database & Threat Posture", targetPercent: 88 }
+        ]}
       />
 
       {/* Floating Pearlescent Fleet Threat Notifications (Top Right Dismissable) */}

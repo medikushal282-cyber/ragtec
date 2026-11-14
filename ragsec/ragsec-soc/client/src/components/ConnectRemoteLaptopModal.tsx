@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Laptop, Wifi, ShieldCheck, X, Plus, Radio, Server, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { DeviceItem } from "./FleetFimView";
+import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -180,6 +181,23 @@ export function ConnectRemoteLaptopModal({
               When connected, RAGSec isolates and views <strong>only the project sandbox directory</strong> (<code>monitored_workspace/</code>) on that laptop. The remote OS file system outside the sandbox is strictly protected.
             </p>
           </div>
+
+          {/* Real-time ETA Progress Bar during mTLS Handshake */}
+          {isSubmitting && (
+            <RealtimeETAProgressBar
+              title="Enterprise SIEM Fleet Sentinel Handshake"
+              subtitle={`Establishing secure mTLS tunnel to ${hostname || "remote-laptop"} (${ipAddress || "192.168.1.x"})...`}
+              isActive={isSubmitting}
+              estimatedDurationMs={2600}
+              accentColor="emerald"
+              stages={[
+                { label: "Stage 1/4: Initializing Mutual TLS Handshake & Certificate Verification", targetPercent: 0 },
+                { label: "Stage 2/4: Pinging Remote Sentinel Daemon on Port 8000", targetPercent: 30 },
+                { label: "Stage 3/4: Mounting Sandboxed Tunnel to monitored_workspace/", targetPercent: 65 },
+                { label: "Stage 4/4: Registering Node in SIEM Fleet & Streaming Telemetry", targetPercent: 88 }
+              ]}
+            />
+          )}
 
           <div className="pt-2 border-t border-white/[0.06] flex items-center justify-end gap-2">
             <button

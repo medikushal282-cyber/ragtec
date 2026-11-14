@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -248,6 +249,9 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
   const [isBatchScanning, setIsBatchScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; currentFileName: string } | null>(null);
   const cancelScanRef = useRef(false);
+  const [activeSingleScanFile, setActiveSingleScanFile] = useState<WorkspaceFileItem | null>(null);
+  const [activeDeepScanQuarantined, setActiveDeepScanQuarantined] = useState<QuarantinedFileItem | null>(null);
+  const [isApplyingRemediation, setIsApplyingRemediation] = useState(false);
 
   // ----------------------------------------------------
   // Right-Click Context Menu State
@@ -482,6 +486,7 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
   // Apply Vulnerability Remediation (SAST Auto-Patch)
   // ----------------------------------------------------
   const handleApplyVulnerabilityRemediation = async (file: WorkspaceFileItem, actionType?: string) => {
+    setIsApplyingRemediation(true);
     try {
       toast.info(`Applying SAST security remediation to ${file.filename}...`);
       const res = await fetch(`${API_BASE_URL}/api/fim/remediate-vulnerability`, {
@@ -510,6 +515,8 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
       }
     } catch (err: any) {
       toast.error(`Remediation error: ${err.message}`);
+    } finally {
+      setIsApplyingRemediation(false);
     }
   };
 
@@ -517,6 +524,7 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
   // Single File Live AI Classification
   // ----------------------------------------------------
   const analyzeSingleFile = async (file: WorkspaceFileItem) => {
+    setActiveSingleScanFile(file);
     // Set file to ANALYZING state
     setFiles(prev => prev.map(f => f.filename === file.filename ? { ...f, verdict: "ANALYZING" } : f));
     if (selectedFile?.filename === file.filename) {
@@ -584,6 +592,7 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
     } catch (e: any) {
       toast.error(`Analysis failed for ${file.filename}: ${e.message}`);
     } finally {
+      setActiveSingleScanFile(null);
       setFiles(prev => prev.map(f => {
         if (f.filename === file.filename && f.verdict === "ANALYZING") {
           return { ...f, verdict: "PENDING" };
@@ -832,6 +841,7 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
   };
 
   const handleDeepScanQuarantined = async (qFile: QuarantinedFileItem) => {
+    setActiveDeepScanQuarantined(qFile);
     toast.loading(`Deep forensic scanning ${qFile.filename} with ${selectedModel.split("/").pop()}...`, { id: "deep-scan" });
     try {
       const res = await fetch(`${API_BASE_URL}/api/fim/analyze-file`, {
@@ -857,6 +867,8 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
       }
     } catch (e: any) {
       toast.error(`Forensic scan error: ${e.message}`, { id: "deep-scan" });
+    } finally {
+      setActiveDeepScanQuarantined(null);
     }
   };
 
@@ -1187,31 +1199,75 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
         </motion.div>
       )}
 
-      {/* SEQUENTIAL PROGRESS BAR (Active during one-by-one batch scan) */}
-      {isBatchScanning && scanProgress && (
-        <div className="apple-panel p-4 border border-blue-500/30 bg-blue-500/[0.03] space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin" />
-              <span className="text-white font-medium">
-                Live Classifying File {scanProgress.current} of {scanProgress.total}:
-              </span>
-              <code className="text-cyan-300 font-mono px-2 py-0.5 rounded bg-black/40">
-                {scanProgress.currentFileName}
-              </code>
-            </div>
-            <span className="text-[#8E8E93] font-mono text-[11px]">
-              {Math.round((scanProgress.current / scanProgress.total) * 100)}%
-            </span>
-          </div>
+      {/* REAL-TIME ETA PROGRESS BAR: BATCH SYSTEM SCAN */}
+      {isBatchScanning && (
+        <RealtimeETAProgressBar
+          title="Initial System Scan & Groq LPU Classification"
+          subtitle={scanProgress ? `Scanning file ${scanProgress.current}/${scanProgress.total}: ${scanProgress.currentFileName}` : `Streaming workspace payloads to ${selectedModel.split("/").pop()}...`}
+          isActive={isBatchScanning}
+          currentStep={scanProgress?.current}
+          totalSteps={scanProgress?.total || files.length}
+          progressPercent={scanProgress ? Math.round((scanProgress.current / scanProgress.total) * 100) : undefined}
+          estimatedDurationMs={Math.max(3000, files.length * 400)}
+          onCancel={handleStopSequentialScan}
+          accentColor="blue"
+          stages={[
+            { label: "Stage 1/4: Ingesting Raw Workspace Payloads & AST Tokenization", targetPercent: 0 },
+            { label: "Stage 2/4: Computing Shannon Entropy & Heuristic Signature Matching", targetPercent: 25 },
+            { label: "Stage 3/4: Groq LPU Zero-Trust Inference & Anomaly Classification", targetPercent: 60 },
+            { label: "Stage 4/4: Synchronizing Risk Index & SQLite Audit Catalog", targetPercent: 88 }
+          ]}
+        />
+      )}
 
-          <div className="w-full h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300"
-              style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
-            />
-          </div>
-        </div>
+      {/* REAL-TIME ETA PROGRESS BAR: SINGLE FILE DEEP SCAN */}
+      {activeSingleScanFile && !isBatchScanning && (
+        <RealtimeETAProgressBar
+          title="Groq LPU Deep File Analysis"
+          subtitle={`Classifying ${activeSingleScanFile.filename} with ${selectedModel.split("/").pop()}...`}
+          isActive={Boolean(activeSingleScanFile)}
+          estimatedDurationMs={2400}
+          accentColor="purple"
+          stages={[
+            { label: "Stage 1/4: Reading Byte Stream & Parsing File Syntax", targetPercent: 0 },
+            { label: "Stage 2/4: Calculating Shannon Entropy & Security Heuristics", targetPercent: 28 },
+            { label: "Stage 3/4: High-Speed Groq Inference & Confidence Scoring", targetPercent: 65 },
+            { label: "Stage 4/4: Formatting Structured Threat Verdict & Remediation Rules", targetPercent: 88 }
+          ]}
+        />
+      )}
+
+      {/* REAL-TIME ETA PROGRESS BAR: QUARANTINED FORENSIC RE-SCAN */}
+      {activeDeepScanQuarantined && (
+        <RealtimeETAProgressBar
+          title="Quarantined Enclave Forensic Re-Scan"
+          subtitle={`Deep static & symbolic decompilation of ${activeDeepScanQuarantined.filename}...`}
+          isActive={Boolean(activeDeepScanQuarantined)}
+          estimatedDurationMs={2600}
+          accentColor="amber"
+          stages={[
+            { label: "Stage 1/4: Reading Defused chmod 000 Artifact from Enclave", targetPercent: 0 },
+            { label: "Stage 2/4: Evaluating Byte Hex Distribution & Packing Indicators", targetPercent: 25 },
+            { label: "Stage 3/4: Groq LPU Reverse Engineering & MITRE ATT&CK Mapping", targetPercent: 62 },
+            { label: "Stage 4/4: Synthesizing Incident Attribution & Containment Report", targetPercent: 88 }
+          ]}
+        />
+      )}
+
+      {/* REAL-TIME ETA PROGRESS BAR: SAST AUTO-PATCH REMEDIATION */}
+      {isApplyingRemediation && (
+        <RealtimeETAProgressBar
+          title="SAST Vulnerability Remediation & Code Patching"
+          subtitle="Synthesizing secure code pattern and applying hot patch to workspace..."
+          isActive={isApplyingRemediation}
+          estimatedDurationMs={1800}
+          accentColor="emerald"
+          stages={[
+            { label: "Stage 1/3: Parsing Abstract Syntax Tree & Line Flaw", targetPercent: 0 },
+            { label: "Stage 2/3: Applying Parameterized Safe Query / Sanitized Subprocess", targetPercent: 40 },
+            { label: "Stage 3/3: Re-compiling Code & Verifying Post-Patch Integrity", targetPercent: 80 }
+          ]}
+        />
       )}
 
       {/* =================================================================== */}
@@ -1734,6 +1790,25 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
                       </div>
                     )}
 
+                    {/* Quarantined Artifacts Status Banner for Explorer View */}
+                    {quarantinedFiles.length > 0 && (!explorerPath || explorerPath === "") && (
+                      <div className="p-3 px-4 rounded-xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-between text-xs text-purple-200">
+                        <div className="flex items-center gap-2.5">
+                          <ShieldCheck className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                          <span>
+                            <strong>{quarantinedFiles.length} threat artifacts</strong> have been isolated in the <span className="font-mono text-purple-300">.quarantine</span> security enclave.
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setDisplayMode("quarantine")}
+                          className="px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-[11px] font-semibold text-purple-200 transition-colors apple-button flex items-center gap-1"
+                        >
+                          <Lock className="w-3 h-3 text-purple-400" />
+                          <span>View Vault &rarr;</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* SECTION 2: FILES IN DIRECTORY */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider px-1">
@@ -1742,10 +1817,33 @@ export const FileThreatScannerView: React.FC<FileThreatScannerProps> = ({
                       </div>
 
                       {sortedExplorerFiles.length === 0 ? (
-                        <div className="py-12 text-center text-[#8E8E93] border border-dashed border-white/[0.08] rounded-2xl p-6 space-y-2">
-                          <FolderOpen className="w-8 h-8 text-slate-600 mx-auto" />
-                          <p className="text-white font-medium text-xs">No files in this folder</p>
-                          <p className="text-[11px] text-[#8E8E93]">Use "+ Add File" above or navigate to a different directory.</p>
+                        <div className="py-12 text-center text-[#8E8E93] border border-dashed border-white/[0.08] rounded-2xl p-6 space-y-3">
+                          {quarantinedFiles.length > 0 && (!explorerPath || explorerPath === "") ? (
+                            <>
+                              <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto opacity-80" />
+                              <div className="space-y-1 max-w-md mx-auto">
+                                <p className="text-white font-medium text-xs">Workspace Root Is Clean & Contained</p>
+                                <p className="text-[11px] text-[#8E8E93]">
+                                  All {quarantinedFiles.length} detected threat files in this workspace have been safely neutralized and isolated into the <span className="font-mono text-purple-300">.quarantine</span> enclave.
+                                </p>
+                              </div>
+                              <div className="pt-2">
+                                <button
+                                  onClick={() => setDisplayMode("quarantine")}
+                                  className="px-3.5 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-all apple-button"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                  <span>Inspect Quarantine Vault ({quarantinedFiles.length} files)</span>
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <FolderOpen className="w-8 h-8 text-slate-600 mx-auto" />
+                              <p className="text-white font-medium text-xs">No files in this folder</p>
+                              <p className="text-[11px] text-[#8E8E93]">Use "+ Add File" above or navigate to a different directory.</p>
+                            </>
+                          )}
                         </div>
                       ) : (
                         <div className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">

@@ -64,19 +64,55 @@ def ensure_seed_workspace_files(ws_dir: str):
 @router.get("/stats")
 def get_dashboard_stats():
     """
-    Computes real-time live statistics across all SQLite tables (events, file_analyses, incidents).
+    Computes real-time live statistics across all SQLite tables (events, file_analyses, incidents)
+    synchronized with physical on-disk files in monitored_workspace/ and the .quarantine enclave.
     """
     events = get_all_records("events")
     analyses = get_all_records("file_analyses")
     incidents = get_all_records("incidents")
+    workspace_dir = get_workspace_dir()
+    quarantine_dir = os.path.join(workspace_dir, ".quarantine")
 
-    taxonomy_counts = {cat: 0 for cat in ALL_CATEGORIES}
-    threat_count = 0
-    benign_count = 0
-    unknown_count = 0
+    # 1. Gather all quarantined items in enclave
+    quarantined_count = 0
+    if os.path.exists(quarantine_dir):
+        quarantined_count = len([f for f in os.listdir(quarantine_dir) if os.path.isfile(os.path.join(quarantine_dir, f))])
+
+    # 2. Map known file analyses for fast lookup
+    analyses_by_name = {}
+    for a in analyses:
+        if isinstance(a, dict) and a.get("filename"):
+            analyses_by_name[a["filename"].lower()] = a
+
+    # 3. Scan physical disk files in monitored_workspace (strictly excluding .quarantine and .git)
+    active_threat_files = set()
+    clean_files_on_disk = 0
+    for root, dirs, files in os.walk(workspace_dir):
+        if ".quarantine" in root or ".git" in root or "replication_sandbox" in root:
+            continue
+        for f in files:
+            f_lower = f.lower()
+            rec = analyses_by_name.get(f_lower)
+            is_threat = False
+            if rec:
+                is_threat = rec.get("threat_state") in ["THREAT", "SUSPICIOUS"] or rec.get("risk_score", 0) > 50
+            else:
+                is_threat = any(kw in f_lower for kw in ["malware", "ransomware", "backdoor", "trojan", "suspicious", "exploit"])
+            
+            if is_threat:
+                active_threat_files.add(f)
+            else:
+                clean_files_on_disk += 1
+
+    active_threat_count = len(active_threat_files)
     monitored_events = len(events)
 
-    # 1. Aggregate from events
+    taxonomy_counts = {cat: 0 for cat in ALL_CATEGORIES}
+    historical_threat_count = 0
+    benign_count = 0
+    unknown_count = 0
+
+    # Aggregate historical taxonomy from events
     for e in events:
         if not isinstance(e, dict):
             continue
@@ -94,36 +130,22 @@ def get_dashboard_stats():
         taxonomy_counts[matched_cat] += 1
 
         if status == "THREAT" or e.get("is_suspicious") is True or c.get("risk_score", 0) > 50:
-            threat_count += 1
+            historical_threat_count += 1
         elif matched_cat == "BENIGN":
             benign_count += 1
         elif matched_cat == "UNKNOWN":
             unknown_count += 1
 
-    # 2. Aggregate from file_analyses
-    for a in analyses:
-        if not isinstance(a, dict):
-            continue
-        cat = a.get("classification") or "BENIGN"
-        matched_cat = "BENIGN"
-        for ac in ALL_CATEGORIES:
-            if ac.lower() == cat.lower() or cat.lower() in ac.lower():
-                matched_cat = ac
-                break
-        taxonomy_counts[matched_cat] += 1
-        if a.get("threat_state") == "THREAT" or a.get("risk_score", 0) > 50:
-            threat_count += 1
-        elif matched_cat == "BENIGN":
-            benign_count += 1
-
     return {
         # Field names that match frontend expectations
-        "threat_index": "ACTIVE" if threat_count > 0 else "NORMAL",
-        "threat_index_active": threat_count,
-        "threat_count": threat_count,
+        "threat_index": "ACTIVE" if active_threat_count > 0 else "NORMAL",
+        "threat_index_active": active_threat_count,
+        "threat_count": active_threat_count,
+        "quarantined_count": quarantined_count,
+        "historical_threat_count": historical_threat_count,
         "monitored_events_count": monitored_events,
         "monitored_events": monitored_events,
-        "benign_count": benign_count,
+        "benign_count": max(clean_files_on_disk, benign_count),
         "unknown_count": unknown_count,
         "active_incidents_count": len(incidents),
         "taxonomy_counts": taxonomy_counts

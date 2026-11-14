@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DeploymentChecklistCard } from "./DeploymentChecklistCard";
+import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -223,6 +224,24 @@ export const TestReportsView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Real-time ETA Progress Bar: Autonomous Test Suite Execution */}
+      {runningTests && (
+        <RealtimeETAProgressBar
+          title="Running Autonomous Security Benchmark Suite"
+          subtitle="Executing test matrices across 10 threat archetypes, FIM isolation, and CTI attribution..."
+          isActive={runningTests}
+          estimatedDurationMs={3600}
+          accentColor="purple"
+          stages={[
+            { label: "Stage 1/5: Testing FIM Quarantine Isolation & chmod 000 Enforcement", targetPercent: 0 },
+            { label: "Stage 2/5: Validating 10-Archetype Threat Detection & High-Entropy Classifier", targetPercent: 20 },
+            { label: "Stage 3/5: Benchmarking RAG Retrieval Latency & Grounded Context Attribution", targetPercent: 45 },
+            { label: "Stage 4/5: Testing SAST Code Parameterization & Automated Patch Injection", targetPercent: 70 },
+            { label: "Stage 5/5: Generating Cryptographic Audit Signature & Verifying IEEE Metrics", targetPercent: 90 }
+          ]}
+        />
+      )}
 
       {/* Autonomous Test Results Banner (if executed) */}
       {testRunSummary && (

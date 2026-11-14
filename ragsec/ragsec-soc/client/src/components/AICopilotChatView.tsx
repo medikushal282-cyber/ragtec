@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { RealtimeETAProgressBar } from "./RealtimeETAProgressBar";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -1388,20 +1389,24 @@ export const AICopilotChatView: React.FC<AICopilotChatViewProps> = ({
                 );
               })}
 
-              {/* Thinking / Streaming Indicator */}
+              {/* Thinking / Streaming Indicator with Real-Time ETA Progress */}
               {isThinking && (
-                <div className="flex gap-3 items-center">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center flex-shrink-0 animate-pulse">
-                    <Bot className="w-4 h-4 text-blue-400 animate-spin" />
-                  </div>
-                  <div className="p-3.5 px-4 rounded-2xl bg-white/[0.035] border border-white/[0.08] text-xs font-mono text-blue-300 flex items-center gap-2.5">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400" />
-                    <span>
-                      {searchOnline 
-                        ? `Consulting Groq LPU (${selectedModel.split("/").pop()}) & querying MITRE / NVD / MS Learn...` 
-                        : `Consulting Groq LPU (${selectedModel.split("/").pop()}) with multi-turn chain memory...`}
-                    </span>
-                  </div>
+                <div className="space-y-2 max-w-xl">
+                  <RealtimeETAProgressBar
+                    title="Groq LPU Reasoning & Deep Investigation"
+                    subtitle={searchOnline 
+                      ? `Querying live MITRE CTI & telemetry for ${targetHost} with ${selectedModel.split("/").pop()}...` 
+                      : `Correlating multi-turn endpoint telemetry for ${targetHost} with ${selectedModel.split("/").pop()}...`}
+                    isActive={isThinking}
+                    estimatedDurationMs={4200}
+                    accentColor="purple"
+                    stages={[
+                      { label: "Stage 1/4: Ingesting Process Telemetry & CTI Embeddings", targetPercent: 0 },
+                      { label: "Stage 2/4: Grounding Incident History & Baseline Evaluation", targetPercent: 28 },
+                      { label: "Stage 3/4: Groq LPU Token Stream & Playbook Synthesis", targetPercent: 62 },
+                      { label: "Stage 4/4: Formatting Proportional Remediation Options", targetPercent: 88 }
+                    ]}
+                  />
                 </div>
               )}
 

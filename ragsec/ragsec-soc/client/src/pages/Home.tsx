@@ -1,4 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FileCodeExplorer } from "../components/FileCodeExplorer";
+import { ProcessExplainerView } from "../components/ProcessExplainerView";
 
 type Severity = "THREAT" | "SUSPICIOUS" | "SAFE" | "QUARANTINED";
 type EventRow = {
@@ -89,7 +91,9 @@ const seedEvents: EventRow[] = [
 const nav = [
   ["threat", "Threat Center", "LIVE"],
   ["scanner", "AI Threat Scanner", "GROQ LPU"],
+  ["explorer", "File & Code Explorer", "AST"],
   ["fleet", "Fleet & IEM", "IEM"],
+  ["processes", "Live Process Explainer", "LIVE"],
   ["playbooks", "Mitigation & Playbooks", "HITL"],
   ["copilot", "AI Copilot Chat", "CHAT"],
 ];
@@ -106,7 +110,9 @@ const labNav = [
 const titles: Record<string, [string, string]> = {
   threat: ["Threat Center", "Real-time security posture and filesystem telemetry"],
   scanner: ["AI Threat Scanner", "Static analysis and zero-trust quarantine enclave"],
+  explorer: ["File & Code Explorer", "Interactive workspace inventory, byte disassembler & live AST token inspector"],
   fleet: ["Fleet & IEM", "Enterprise endpoint integrity mesh"],
+  processes: ["Live Process Explainer", "Real-time host process selector, forensic telemetry & AI safety evaluation"],
   playbooks: ["Mitigation & Playbooks", "Human-authorized autonomous response"],
   copilot: ["AI Copilot", "Grounded security intelligence assistant"],
   triage: ["Incident Triage", "Structured forensics and evidence curation"],
@@ -183,6 +189,18 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
         <circle cx="19" cy="5" r="2" />
         <circle cx="19" cy="19" r="2" />
         <path d="m7 11 10-5M7 13l10 5" />
+      </>
+    ),
+    explorer: (
+      <>
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+        <path d="M9 4v16M14 10l3 3-3 3" />
+      </>
+    ),
+    processes: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M9 9h6M9 13h6M9 17h4" />
       </>
     ),
   };
@@ -667,7 +685,29 @@ function App() {
               inject={inject}
             />
           )}
+          {view === "explorer" && (
+            <div className="panel p-5">
+              <FileCodeExplorer
+                onFileQuarantined={(path: string) => {
+                  setQuarantine((prev: any) => [...prev, path]);
+                  notify(`Quarantined: ${path}`);
+                }}
+                onFileDeleted={(path: string) => {
+                  notify(`Removed from workspace: ${path}`);
+                }}
+              />
+            </div>
+          )}
           {view === "fleet" && <FleetView notify={notify} inject={inject} />}
+          {view === "processes" && (
+            <ProcessExplainerView
+              notify={notify}
+              onAskCopilot={(prompt: string) => {
+                setView("copilot");
+                notify("Telemetry loaded into AI Copilot");
+              }}
+            />
+          )}
           {view === "playbooks" && <PlaybookView notify={notify} />}
           {view === "copilot" && (
             <CopilotView model={model} openModel={() => setModal("model")} notify={notify} />
@@ -1319,7 +1359,7 @@ function FleetView({ notify, inject }: any) {
               />
             </div>
           ) : (
-            <ProcessList notify={notify} />
+            <ProcessExplainerView notify={notify} />
           )}
         </Modal>
       )}

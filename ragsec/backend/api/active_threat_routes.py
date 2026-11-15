@@ -102,6 +102,15 @@ def purge_quarantined_replicas():
     res = active_threat_detector.purge_quarantined_replicas()
     return res
 
+@router.get("/sentinel/status")
+def get_sentinel_status():
+    """Returns status of autonomous real-time interceptor sentinel."""
+    return {
+        "status": "ONLINE" if active_threat_detector.sentinel_enabled else "STANDBY",
+        "active": active_threat_detector.sentinel_enabled,
+        "sentinel_enabled": active_threat_detector.sentinel_enabled
+    }
+
 @router.post("/sentinel/toggle")
 def toggle_sentinel(req: SentinelToggleReq):
     """Enables or disables autonomous real-time interceptor sentinel loop."""
